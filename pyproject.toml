@@ -1,0 +1,32 @@
+[build-system]
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "team2_mlops2026"
+version = "0.0.1"
+description = "Project for MLOps Course for the Master in Applied AI from Tec de Monterrey"
+authors = [
+  { name = "Team 2 MNA MLOps" },
+]
+license = { file = "LICENSE" }
+readme = "README.md"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License"
+]
+requires-python = "~=3.10.0"
+
+
+[tool.ruff]
+line-length = 99
+src = ["team2_mlops2026"]
+include = ["pyproject.toml", "team2_mlops2026/**/*.py"]
+
+[tool.ruff.lint]
+extend-select = ["I"]  # Add import sorting
+
+[tool.ruff.lint.isort]
+known-first-party = ["team2_mlops2026"]
+force-sort-within-sections = true
+
