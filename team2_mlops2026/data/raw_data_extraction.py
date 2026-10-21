@@ -148,9 +148,15 @@ def save_manifest(path: Path, manifest: dict) -> None:
 
 
 def is_up_to_date(dest: Path, prev: dict | None, url: str) -> bool:
-    # Re-download if missing or if the source URL changed
-    # (MiBici sometimes re-publishes a corrected month under another folder/suffix).
-    return dest.exists() and prev is not None and prev["source_url"] == url
+    if not (dest.exists() and prev is not None and prev.get("source_url") == url):
+        return False
+    if "sha256" not in prev:
+        return True  # Backward-compatible with manifests created before hashes.
+    h = hashlib.sha256()
+    with dest.open("rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest() == prev["sha256"] and dest.stat().st_size == prev.get("bytes", -1)
 
 
 def ingest(
@@ -170,8 +176,11 @@ def ingest(
               pending: [files, dry_run only], manifest_path}
     Each new entry: {name, path, source_url, sha256, bytes, downloaded_at}
     """
-    if since and not PERIOD_RE.fullmatch(since):
-        raise ValueError(f"--since must have format YYYY-MM, got {since!r}")
+if since:
+        try:
+            datetime.strptime(since, "%Y-%m")
+        except ValueError as e:
+            raise ValueError(f"--since must have format YYYY-MM, got {since!r}") from e
 
     out = Path(out)
     manifest_path = out / MANIFEST_NAME
