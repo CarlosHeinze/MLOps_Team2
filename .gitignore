@@ -1,6 +1,8 @@
 # Data
 data/external/*
 !data/external/.gitkeep
+data/raw/*
+!data/raw/.gitkeep
 
 # Mac OS-specific storage files
 .DS_Store
