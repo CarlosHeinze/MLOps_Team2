@@ -24,6 +24,7 @@ Usage (notebook):
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
@@ -32,6 +33,7 @@ import json
 import os
 from pathlib import Path
 import re
+import threading
 from typing import Annotated
 from urllib.parse import unquote, urljoin, urlsplit
 
@@ -68,7 +70,8 @@ class RemoteFile:
     period: str  # YYYY-MM
 
 
-def make_session(pool_size: int = DEFAULT_WORKERS) -> requests.Session:
+def make_session() -> requests.Session:
+    """Session with retries. Not thread-safe: create one per thread (see ``ingest``)."""
     s = requests.Session()
     retry = Retry(
         total=5,
@@ -76,7 +79,7 @@ def make_session(pool_size: int = DEFAULT_WORKERS) -> requests.Session:
         status_forcelist=(429, 500, 502, 503, 504),
         allowed_methods=("GET", "HEAD"),
     )
-    s.mount("https://", HTTPAdapter(max_retries=retry, pool_maxsize=pool_size))
+    s.mount("https://", HTTPAdapter(max_retries=retry))
     s.headers["User-Agent"] = "mibici-mlops-ingest/1.0 (+open data)"
     return s
 
@@ -100,8 +103,10 @@ def discover_files(session: requests.Session) -> list[RemoteFile]:
     found: dict[str, RemoteFile] = {}
     for a in BeautifulSoup(html, "html.parser").find_all("a", href=True):
         url = urljoin(base, a["href"])
-        name = unquote(urlsplit(url).path.rsplit("/", 1)[-1])
-        if m := CSV_RE.search(name):
+        # Decode BEFORE taking the basename
+        path = unquote(urlsplit(url).path).replace("\\", "/")
+        name = path.rsplit("/", 1)[-1]
+        if m := CSV_RE.fullmatch(name):
             found[name] = RemoteFile(name, url, f"{m[1]}-{m[2]}")
 
     if not found:
@@ -154,9 +159,12 @@ def ingest(
     force: bool = False,
     dry_run: bool = False,
     workers: int = DEFAULT_WORKERS,
-    session: requests.Session | None = None,
+    session_factory: Callable[[], requests.Session] = make_session,
 ) -> dict:
     """Runs the extraction and returns a summary (used by the CLI, the notebook and MLflow).
+
+    ``session_factory`` is called once for page discovery and once per worker thread,
+    since a ``requests.Session`` must not be shared across threads.
 
     Summary: {discovered, selected, skipped, new: [entries], failed: [urls],
               pending: [files, dry_run only], manifest_path}
@@ -168,9 +176,12 @@ def ingest(
     out = Path(out)
     manifest_path = out / MANIFEST_NAME
     manifest = load_manifest(manifest_path)
-    session = session or make_session(workers)
 
-    files = discover_files(session)
+    discovery_session = session_factory()
+    try:
+        files = discover_files(discovery_session)
+    finally:
+        discovery_session.close()
     discovered = len(files)
     logger.info("Found {} files on the page", discovered)
     if since:
@@ -195,26 +206,39 @@ def ingest(
         summary["pending"] = [asdict(f) for f in pending]
         return summary
 
-    with ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = {pool.submit(download, session, f.url, out / f.name): f for f in pending}
-        for future in tqdm(as_completed(futures), total=len(futures), desc="Downloading"):
-            f = futures[future]
-            try:
-                sha, size = future.result()
-            except Exception as e:  # noqa: BLE001
-                logger.error("Failed {}: {}", f.url, e)
-                summary["failed"].append(f.url)
-                continue
-            entry = {
-                "source_url": f.url,
-                "sha256": sha,
-                "bytes": size,
-                "downloaded_at": datetime.now(UTC).isoformat(),
-            }
-            manifest[f.name] = entry
-            summary["new"].append({**entry, "name": f.name, "path": str(out / f.name)})
-            # Save after each file so progress is not lost
-            save_manifest(manifest_path, manifest)
+    # One session per worker thread, created lazily and closed when the pool finishes
+    local, sessions = threading.local(), []
+
+    def download_in_worker(url: str, dest: Path) -> tuple[str, int]:
+        if not hasattr(local, "session"):
+            local.session = session_factory()
+            sessions.append(local.session)
+        return download(local.session, url, dest)
+
+    try:
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {pool.submit(download_in_worker, f.url, out / f.name): f for f in pending}
+            for future in tqdm(as_completed(futures), total=len(futures), desc="Downloading"):
+                f = futures[future]
+                try:
+                    sha, size = future.result()
+                except Exception as e:  # noqa: BLE001
+                    logger.error("Failed {}: {}", f.url, e)
+                    summary["failed"].append(f.url)
+                    continue
+                entry = {
+                    "source_url": f.url,
+                    "sha256": sha,
+                    "bytes": size,
+                    "downloaded_at": datetime.now(UTC).isoformat(),
+                }
+                manifest[f.name] = entry
+                summary["new"].append({**entry, "name": f.name, "path": str(out / f.name)})
+                # Save after each file so progress is not lost
+                save_manifest(manifest_path, manifest)
+    finally:
+        for s in sessions:
+            s.close()
 
     logger.success(
         "Done: {} new, {} skipped, {} failed",
