@@ -1,3 +1,4 @@
+beautifulsoup4
 ipython
 jupyterlab
 loguru
@@ -9,6 +10,7 @@ pandas
 pip
 pytest
 python-dotenv
+requests
 ruff
 scikit-learn
 tqdm
