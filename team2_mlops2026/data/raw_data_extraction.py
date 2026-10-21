@@ -176,11 +176,15 @@ def ingest(
               pending: [files, dry_run only], manifest_path}
     Each new entry: {name, path, source_url, sha256, bytes, downloaded_at}
     """
-if since:
+    if since:
+        # strptime rejects impossible months (2024-13); the round trip rejects unpadded
+        # values (2024-1), which would break the string comparison with f.period below.
         try:
-            datetime.strptime(since, "%Y-%m")
-        except ValueError as e:
-            raise ValueError(f"--since must have format YYYY-MM, got {since!r}") from e
+            valid = datetime.strptime(since, "%Y-%m").strftime("%Y-%m") == since
+        except ValueError:
+            valid = False
+        if not valid:
+            raise ValueError(f"--since must have format YYYY-MM, got {since!r}")
 
     out = Path(out)
     manifest_path = out / MANIFEST_NAME
