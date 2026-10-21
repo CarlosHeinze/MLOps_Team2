@@ -1,23 +1,23 @@
 """
-Extracción de datos crudos de MiBici (datos abiertos) -> data/raw/mibici/
+Raw data extraction from MiBici open data -> data/raw/mibici/
 
-Única responsabilidad: poblar la carpeta raw con los CSV tal como los publica MiBici,
-SIN modificarlos y con su nombre original. La normalización de nombres y estructura
-vive en ``raw_data_normalization.py``.
+Single responsibility: populate the raw folder with the CSVs exactly as MiBici publishes
+them, UNMODIFIED and with their original names. Name and structure normalization lives
+in ``raw_data_normalization.py``.
 
-- Lee la página de datos abiertos y extrae los enlaces .csv (las URLs tienen IDs de
-  carpeta impredecibles, por lo que NO se pueden construir).
-- Descarga solo lo que falta (idempotente), en paralelo, con reintentos y escritura atómica.
-- Mantiene ``manifest.json`` con URL de origen, sha256, tamaño y fecha de descarga
-  (linaje para DVC / validaciones posteriores).
+- Reads the open data page and extracts the .csv links (URLs contain unpredictable
+  folder IDs, so they CANNOT be built).
+- Downloads only what is missing (idempotent), in parallel, with retries and atomic writes.
+- Keeps a ``manifest.json`` with source URL, sha256, size and download date
+  (lineage for DVC / later validations).
 
-Uso (CLI):
-    python -m team2_mlops2026.data.raw_data_extraction                    # todo lo que falte
-    python -m team2_mlops2026.data.raw_data_extraction --since 2024-01    # solo desde ese mes
-    python -m team2_mlops2026.data.raw_data_extraction --force            # re-descarga todo
-    python -m team2_mlops2026.data.raw_data_extraction --dry-run          # solo lista
+Usage (CLI):
+    python -m team2_mlops2026.data.raw_data_extraction                    # everything missing
+    python -m team2_mlops2026.data.raw_data_extraction --since 2024-01    # only from that month
+    python -m team2_mlops2026.data.raw_data_extraction --force            # re-download all
+    python -m team2_mlops2026.data.raw_data_extraction --dry-run          # list only
 
-Uso (notebook):
+Usage (notebook):
     from team2_mlops2026.data.raw_data_extraction import ingest
     summary = ingest(since="2024-01")
 """
@@ -52,7 +52,7 @@ RAW_MIBICI_DIR = RAW_DATA_DIR / "mibici"
 MANIFEST_NAME = "manifest.json"
 DEFAULT_WORKERS = 4
 
-# Solo reconoce los CSV de MiBici y su periodo (para --since); no renombra nada.
+# Only recognizes MiBici CSVs and their period (for --since); does not rename anything.
 CSV_RE = re.compile(
     r"(?:datos_abiertos|nomenclatura)_(\d{4})_(\d{2})(?:-\d+)?\.csv$", re.IGNORECASE
 )
@@ -63,7 +63,7 @@ app = typer.Typer()
 
 @dataclass(frozen=True)
 class RemoteFile:
-    name: str  # nombre original publicado por MiBici
+    name: str  # original name published by MiBici
     url: str
     period: str  # YYYY-MM
 
@@ -77,25 +77,25 @@ def make_session(pool_size: int = DEFAULT_WORKERS) -> requests.Session:
         allowed_methods=("GET", "HEAD"),
     )
     s.mount("https://", HTTPAdapter(max_retries=retry, pool_maxsize=pool_size))
-    s.headers["User-Agent"] = "mibici-mlops-ingest/1.0 (+datos abiertos)"
+    s.headers["User-Agent"] = "mibici-mlops-ingest/1.0 (+open data)"
     return s
 
 
 def fetch_page(session: requests.Session) -> tuple[str, str]:
-    """Devuelve (html, url_base) de la página de datos abiertos, con fallback."""
-    page = os.environ.get("MIBICI_PAGE_URL", PAGE_URL)  # override útil para pruebas
+    """Returns (html, base_url) of the open data page, with fallback."""
+    page = os.environ.get("MIBICI_PAGE_URL", PAGE_URL)  # override useful for testing
     for url in (page, FALLBACK_PAGE_URL):
         try:
             r = session.get(url, timeout=30)
             r.raise_for_status()
             return r.text, url
         except requests.RequestException as e:
-            logger.warning("No se pudo leer {}: {}", url, e)
-    raise RuntimeError("No se pudo leer la página de datos abiertos")
+            logger.warning("Could not read {}: {}", url, e)
+    raise RuntimeError("Could not read the open data page")
 
 
 def discover_files(session: requests.Session) -> list[RemoteFile]:
-    """Extrae los CSV de MiBici enlazados en la página, ordenados por nombre."""
+    """Extracts the MiBici CSVs linked on the page, sorted by name."""
     html, base = fetch_page(session)
     found: dict[str, RemoteFile] = {}
     for a in BeautifulSoup(html, "html.parser").find_all("a", href=True):
@@ -105,12 +105,12 @@ def discover_files(session: requests.Session) -> list[RemoteFile]:
             found[name] = RemoteFile(name, url, f"{m[1]}-{m[2]}")
 
     if not found:
-        raise RuntimeError("No se encontraron CSV: ¿cambió la estructura de la página?")
+        raise RuntimeError("No CSVs found: did the page structure change?")
     return sorted(found.values(), key=lambda f: f.name)
 
 
 def download(session: requests.Session, url: str, dest: Path) -> tuple[str, int]:
-    """Descarga en streaming a un .part y renombra al terminar. Devuelve (sha256, bytes)."""
+    """Streams to a .part file and renames it when done. Returns (sha256, bytes)."""
     dest.parent.mkdir(parents=True, exist_ok=True)
     tmp = dest.with_suffix(dest.suffix + ".part")
     h, size = hashlib.sha256(), 0
@@ -123,7 +123,7 @@ def download(session: requests.Session, url: str, dest: Path) -> tuple[str, int]
                     h.update(chunk)
                     size += len(chunk)
         if size == 0:
-            raise RuntimeError(f"Archivo vacío: {url}")
+            raise RuntimeError(f"Empty file: {url}")
         tmp.replace(dest)
     finally:
         tmp.unlink(missing_ok=True)
@@ -135,7 +135,7 @@ def load_manifest(path: Path) -> dict:
 
 
 def save_manifest(path: Path, manifest: dict) -> None:
-    """Escritura atómica para no corromper el manifest si el proceso se interrumpe."""
+    """Atomic write so the manifest is not corrupted if the process is interrupted."""
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".json.part")
     tmp.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -143,8 +143,8 @@ def save_manifest(path: Path, manifest: dict) -> None:
 
 
 def is_up_to_date(dest: Path, prev: dict | None, url: str) -> bool:
-    # Re-descarga si no existe o si la URL de origen cambió
-    # (MiBici a veces re-publica un mes corregido con otra carpeta/sufijo).
+    # Re-download if missing or if the source URL changed
+    # (MiBici sometimes re-publishes a corrected month under another folder/suffix).
     return dest.exists() and prev is not None and prev["source_url"] == url
 
 
@@ -156,14 +156,14 @@ def ingest(
     workers: int = DEFAULT_WORKERS,
     session: requests.Session | None = None,
 ) -> dict:
-    """Ejecuta la extracción y devuelve un resumen (usado por el CLI, el notebook y MLflow).
+    """Runs the extraction and returns a summary (used by the CLI, the notebook and MLflow).
 
-    Resumen: {discovered, selected, skipped, new: [entradas], failed: [urls],
-              pending: [archivos, solo en dry_run], manifest_path}
-    Cada entrada nueva: {name, path, source_url, sha256, bytes, downloaded_at}
+    Summary: {discovered, selected, skipped, new: [entries], failed: [urls],
+              pending: [files, dry_run only], manifest_path}
+    Each new entry: {name, path, source_url, sha256, bytes, downloaded_at}
     """
     if since and not PERIOD_RE.fullmatch(since):
-        raise ValueError(f"--since debe tener formato YYYY-MM, se recibió {since!r}")
+        raise ValueError(f"--since must have format YYYY-MM, got {since!r}")
 
     out = Path(out)
     manifest_path = out / MANIFEST_NAME
@@ -172,7 +172,7 @@ def ingest(
 
     files = discover_files(session)
     discovered = len(files)
-    logger.info("Encontrados {} archivos en la página", discovered)
+    logger.info("Found {} files on the page", discovered)
     if since:
         files = [f for f in files if f.period >= since]
 
@@ -197,12 +197,12 @@ def ingest(
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = {pool.submit(download, session, f.url, out / f.name): f for f in pending}
-        for future in tqdm(as_completed(futures), total=len(futures), desc="Descargando"):
+        for future in tqdm(as_completed(futures), total=len(futures), desc="Downloading"):
             f = futures[future]
             try:
                 sha, size = future.result()
             except Exception as e:  # noqa: BLE001
-                logger.error("Falló {}: {}", f.url, e)
+                logger.error("Failed {}: {}", f.url, e)
                 summary["failed"].append(f.url)
                 continue
             entry = {
@@ -213,11 +213,11 @@ def ingest(
             }
             manifest[f.name] = entry
             summary["new"].append({**entry, "name": f.name, "path": str(out / f.name)})
-            # Guardar después de cada archivo para no perder progreso
+            # Save after each file so progress is not lost
             save_manifest(manifest_path, manifest)
 
     logger.success(
-        "Listo: {} nuevos, {} omitidos, {} fallidos",
+        "Done: {} new, {} skipped, {} failed",
         len(summary["new"]),
         summary["skipped"],
         len(summary["failed"]),
@@ -227,13 +227,13 @@ def ingest(
 
 @app.command()
 def main(
-    out: Annotated[Path, typer.Option(help="Carpeta raw de destino")] = RAW_MIBICI_DIR,
+    out: Annotated[Path, typer.Option(help="Destination raw folder")] = RAW_MIBICI_DIR,
     since: Annotated[
-        str | None, typer.Option(help="YYYY-MM: descargar solo desde este mes")
+        str | None, typer.Option(help="YYYY-MM: only download from this month on")
     ] = None,
-    force: Annotated[bool, typer.Option(help="Re-descargar aunque exista")] = False,
-    dry_run: Annotated[bool, typer.Option(help="Solo listar lo que se descargaría")] = False,
-    workers: Annotated[int, typer.Option(help="Descargas en paralelo")] = DEFAULT_WORKERS,
+    force: Annotated[bool, typer.Option(help="Re-download even if it exists")] = False,
+    dry_run: Annotated[bool, typer.Option(help="Only list what would be downloaded")] = False,
+    workers: Annotated[int, typer.Option(help="Parallel downloads")] = DEFAULT_WORKERS,
 ):
     summary = ingest(out, since, force, dry_run, workers)
     raise typer.Exit(code=1 if summary["failed"] else 0)
