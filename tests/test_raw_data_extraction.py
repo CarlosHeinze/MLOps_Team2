@@ -319,7 +319,7 @@ def test_ingest_since_filters_by_period(tmp_path, site):
     assert not (tmp_path / "datos_abiertos_2016_01-1.csv").exists()
 
 
-@pytest.mark.parametrize("since", ["2024-1", "2024_01", "202401", "enero"])
+@pytest.mark.parametrize("since", ["2024-1", "2024-13", "2024_01", "202401", "enero"])
 def test_ingest_rejects_invalid_since(tmp_path, site, since):
     with pytest.raises(ValueError, match="YYYY-MM"):
         rde.ingest(out=tmp_path, since=since, session_factory=lambda: FakeSession(site))
