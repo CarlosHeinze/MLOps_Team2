@@ -120,6 +120,7 @@ def test_charts_render(frame):
         plots.plot_heatmap(frame.abs().iloc[:5], "magnitude", fmt="{:.0f}"),
         plots.plot_grouped_means(frame.groupby(frame["x"].round()).mean(), "means"),
         plots.plot_scatter_matrix(frame.iloc[:200], hue.iloc[:200], "pairs"),
+        plots.plot_maps(frame["x"] - 103, frame["z"] + 20, frame[["x", "y"]], "maps"),
     ]
     assert all(isinstance(f, matplotlib.figure.Figure) for f in figures)
     matplotlib.pyplot.close("all")

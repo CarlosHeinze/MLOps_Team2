@@ -262,3 +262,31 @@ def plot_scatter_matrix(
     fig.suptitle(f"{title} (axes up to p{upper_quantile * 100:g})", fontweight="bold")
     fig.tight_layout()
     return fig
+
+
+def plot_maps(
+    longitude: pd.Series, latitude: pd.Series, values: pd.DataFrame, title: str
+) -> plt.Figure:
+    """One map per column of ``values``: points colored diverging around 0 (e.g. PCA scores)."""
+    n = values.shape[1]
+    fig, axes = plt.subplots(1, n, figsize=(4.5 * n, 5), squeeze=False)
+    for ax, col in zip(axes[0], values.columns):
+        limit = np.nanmax(np.abs(values[col]))
+        points = ax.scatter(
+            longitude,
+            latitude,
+            c=values[col],
+            cmap=DIVERGING,
+            vmin=-limit,
+            vmax=limit,
+            s=14,
+            linewidths=0,
+        )
+        # A degree of longitude is shorter than one of latitude away from the equator
+        ax.set_aspect(1 / np.cos(np.radians(np.nanmean(latitude))))
+        ax.set(title=str(col), xticks=[], yticks=[])
+        ax.grid(False)
+        fig.colorbar(points, ax=ax, shrink=0.7)
+    fig.suptitle(title, fontweight="bold")
+    fig.tight_layout()
+    return fig
