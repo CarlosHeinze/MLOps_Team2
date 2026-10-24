@@ -17,17 +17,22 @@ Output keeps the interim layout and schema, one Parquet per month sorted by star
     viajes/2016/viajes_2016_01.parquet
 plus ``cleaning_report.json`` with the rows each step touched per file (lineage).
 
+Every CLI run is tracked in MLflow (``clean_tracked``): datasets with their digests, the
+contract as params and the cleaning totals as metrics. It needs the tracking server running
+(``mlflow server --host 127.0.0.1 --port 5000``); ``--no-track`` skips it.
+
 Usage (CLI):
     python -m team2_mlops2026.data.interim_data_cleaning
     python -m team2_mlops2026.data.interim_data_cleaning --force --workers 8
 
 Usage (notebook):
-    from team2_mlops2026.data.interim_data_cleaning import clean
-    summary = clean()
+    from team2_mlops2026.data.interim_data_cleaning import clean_tracked
+    summary = clean_tracked()
 """
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -55,6 +60,8 @@ from team2_mlops2026.data.trip_data import (
 
 REPORT_NAME = "cleaning_report.json"
 DEFAULT_WORKERS = 4
+RUN_NAME = "clean-interim-trips"
+MISSING_DATA_STRATEGY = "user profile: fill from the same user's trips, the rest stays <NA>"
 
 # Enough to build user profiles without loading the whole history
 PROFILE_COLUMNS = ("Usuario_Id", "Genero", BIRTH_YEAR, "Inicio_del_viaje")
@@ -384,14 +391,101 @@ def clean(
     return summary
 
 
+def report_totals(dst: str | Path = PROCESSED_MIBICI_DIR) -> dict[str, int]:
+    """Totals of ``cleaning_report.json`` over every processed file (the state of ``dst``)."""
+    report = json.loads((Path(dst) / REPORT_NAME).read_text(encoding="utf-8"))
+    steps = (
+        pd.DataFrame([step for r in report.values() for step in r["steps"]])
+        .groupby("step")[["rows_removed", "cells_changed"]]
+        .sum()
+    )
+    missing = pd.DataFrame([r["missing_demographics"] for r in report.values()]).sum()
+    totals = {
+        "files_processed": len(report),
+        "rows_interim": sum(r["rows_in"] for r in report.values()),
+        "rows_processed": sum(r["rows_out"] for r in report.values()),
+        "duplicates_removed": steps.loc["drop_duplicates", "rows_removed"],
+        "invalid_trips_removed": steps.loc["drop_invalid_trips", "rows_removed"],
+        "demographics_invalidated": steps.loc["invalidate_demographics", "cells_changed"],
+        "demographics_imputed": steps.loc["impute_from_profiles", "cells_changed"],
+        "missing_gender": missing["Genero"],
+        "missing_birth_year": missing[BIRTH_YEAR],
+    }
+    return {k: int(v) for k, v in totals.items()}
+
+
+def clean_tracked(
+    src: str | Path = INTERIM_MIBICI_DIR,
+    dst: str | Path = PROCESSED_MIBICI_DIR,
+    force: bool = False,
+    workers: int = DEFAULT_WORKERS,
+    extra_metrics: Mapping[str, float] | None = None,
+) -> dict:
+    """``clean()`` inside an MLflow run of the project's experiment.
+
+    Logs the interim trips and stations as inputs and the processed trips as output (each with
+    a digest of its files), the contract as params, the cleaning totals plus ``extra_metrics``
+    as metrics and ``cleaning_report.json`` as artifact. The summary gets ``mlflow_run_id``.
+    """
+    # Imported here: mlflow takes seconds to import and the cleaning workers never need it
+    import mlflow
+
+    from team2_mlops2026 import tracking
+
+    src, dst = Path(src), Path(dst)
+    station_file = latest_station_file(src)
+    with tracking.start_run(RUN_NAME) as run:
+        tracking.log_files_dataset(
+            trip_files(src), src / "viajes", "mibici_trips_interim", "interim"
+        )
+        tracking.log_dataset(
+            pd.read_parquet(station_file), station_file, "mibici_stations", "stations"
+        )
+        mlflow.log_params(
+            {
+                "min_duration_s": MIN_DURATION_S,
+                "max_duration_s": MAX_DURATION_S,
+                "max_speed_kmh": MAX_SPEED_KMH,
+                "min_age": MIN_AGE,
+                "max_age": MAX_AGE,
+                "genders": ", ".join(GENDERS),
+                "missing_data_strategy": MISSING_DATA_STRATEGY,
+                "station_nomenclature": station_file.name,
+                "force": force,
+                "workers": workers,
+            }
+        )
+
+        summary = clean(src, dst, force, workers)
+
+        tracking.log_files_dataset(
+            trip_files(dst), dst / "viajes", "mibici_trips_processed", "processed"
+        )
+        mlflow.log_metrics(
+            {
+                **report_totals(dst),
+                "files_cleaned": len(summary["cleaned"]),
+                "files_skipped": summary["skipped"],
+                "files_failed": len(summary["failed"]),
+                **(extra_metrics or {}),
+            }
+        )
+        mlflow.log_artifact(str(dst / REPORT_NAME))
+        if summary["failed"]:
+            mlflow.log_dict(summary["failed"], "failed_files.json")
+    summary["mlflow_run_id"] = run.info.run_id
+    return summary
+
+
 @app.command()
 def main(
     src: Annotated[Path, typer.Option(help="Source interim folder")] = INTERIM_MIBICI_DIR,
     dst: Annotated[Path, typer.Option(help="Destination processed folder")] = PROCESSED_MIBICI_DIR,
     force: Annotated[bool, typer.Option(help="Re-clean even if up to date")] = False,
     workers: Annotated[int, typer.Option(help="Parallel processes")] = DEFAULT_WORKERS,
+    track: Annotated[bool, typer.Option(help="Log the run to the MLflow server")] = True,
 ):
-    summary = clean(src, dst, force, workers)
+    summary = (clean_tracked if track else clean)(src, dst, force, workers)
     raise typer.Exit(code=1 if summary["failed"] else 0)
 
 

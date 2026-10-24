@@ -2,11 +2,11 @@ import matplotlib
 
 matplotlib.use("Agg")
 
-import numpy as np  # noqa: E402
-import pandas as pd  # noqa: E402
-import pytest  # noqa: E402
+import numpy as np
+import pandas as pd
+import pytest
 
-from team2_mlops2026 import eda, plots  # noqa: E402
+from team2_mlops2026 import eda, plots
 
 
 @pytest.fixture

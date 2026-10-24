@@ -32,7 +32,6 @@ def test_load_trips_reads_every_month_as_category(interim_dir):
     assert trips["Genero"].dtype == "category"
 
 
-
 def test_load_stations_reads_the_latest_nomenclature(interim_dir):
     assert td.latest_station_file(interim_dir).name == "nomenclatura_2024_03.parquet"
     assert list(td.load_stations(interim_dir)["id"]) == [1, 2]
@@ -68,4 +67,3 @@ def test_trip_metrics_unknown_station_and_zero_duration_are_nan():
 
 def test_trip_metrics_missing_birth_year_gives_nan_age():
     assert pd.isna(td.trip_metrics(make_trips({BY: None}), STATIONS).loc[0, "age"])
-
