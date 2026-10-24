@@ -30,7 +30,8 @@ reads only the previous step's output, so any step can be re-run on its own.
 | 5. Features and preprocessing | `team2_mlops2026.features` | `data/processed/mibici/features/station_hour_features.parquet` | `1.04` |
 | 6. Station profiles (PCA) | `team2_mlops2026.station_profiles` | `data/processed/mibici/features/station_profiles.parquet` | `1.05` |
 
-Steps 3, 5 and 6 are tracked in MLflow (see [Data versioning](#data-versioning)).
+Every step except the exploratory analysis is tracked in MLflow (see
+[Data versioning](#data-versioning)).
 
 ## How to run
 
@@ -70,8 +71,8 @@ mlflow server --host 127.0.0.1 --port 5000
 ### 3. Data pipeline
 
 ```bash
-python -m team2_mlops2026.data.raw_data_extraction         # ~3 GB, only downloads what is missing
-python -m team2_mlops2026.data.raw_data_normalization
+python -m team2_mlops2026.data.raw_data_extraction         # MLflow run: extract-raw-data (~3 GB)
+python -m team2_mlops2026.data.raw_data_normalization      # MLflow run: normalize-raw-data
 python -m team2_mlops2026.data.interim_data_cleaning       # MLflow run: clean-interim-trips
 python -m team2_mlops2026.features                         # MLflow run: build-station-hour-features
 python -m team2_mlops2026.station_profiles                 # MLflow run: fit-station-profiles
@@ -84,7 +85,8 @@ Every step is idempotent and has `--help`. Useful options:
 | `--since YYYY-MM` | Extraction | Only download from that month on |
 | `--force` | Extraction, normalization, cleaning | Redo files that are up to date |
 | `--workers N` | Extraction, normalization, cleaning | Parallel downloads or processes |
-| `--no-track` | Cleaning, features, profiles | Run without the MLflow server |
+| `--no-track` | All | Run without the MLflow server |
+| `--dry-run` | Extraction | Only list what would be downloaded (never tracked) |
 | `--start YYYY-MM` | Features | First month of the feature table (default `2023-01`) |
 | `--fit-end YYYY-MM` | Profiles | Fit the PCA on the hours before this month (default `2025-10`) |
 | `--variance X` | Profiles | Keep the components that explain this share of the variance (default `0.9`) |
@@ -94,7 +96,7 @@ These are the times and output sizes for the full history (39.1M raw trips), mea
 
 | Step | Time | Output size |
 |---|---|---|
-| Extraction | ~12 min (depends on the network) | 3.0 GB |
+| Extraction | ~12 min (depends on the network); ~20 s when nothing is missing | 3.0 GB |
 | Normalization (8 workers) | ~40 s | 789 MB |
 | Cleaning (8 workers) | ~50 s | 766 MB |
 | Features | ~20 s | 78 MB |
@@ -122,11 +124,23 @@ make lint    # ruff format --check + ruff check
 - **MLflow:** each tracked step is a run in the `mibici` experiment that logs:
   - its input and output datasets, each with a digest of the files' contents, so any change in
     the data produces a new digest
-  - its parameters (the data contract bounds, the feature definition)
-  - its metrics (rows removed per rule, table shape)
+  - its parameters (download options, the data contract bounds, the feature definition)
+  - its metrics (files per encoding and date format, rows removed per rule, table shape)
 
-  Each step's output digest equals the next step's input digest, which links the runs:
-  `clean-interim-trips` → `build-station-hour-features` → `fit-station-profiles`.
+  Each step's output digest equals the next step's input digest. This links the runs from the
+  published CSVs to the model inputs:
+
+  | Dataset | Output of | Input of |
+  |---|---|---|
+  | `mibici_raw` | `extract-raw-data` | `normalize-raw-data` |
+  | `mibici_trips_interim` | `normalize-raw-data` | `clean-interim-trips` |
+  | `mibici_stations` | `normalize-raw-data` | `clean-interim-trips`, `build-station-hour-features` |
+  | `mibici_trips_processed` | `clean-interim-trips` | `build-station-hour-features` |
+  | `mibici_station_hour_features` | `build-station-hour-features` | `fit-station-profiles` |
+  | `mibici_station_profiles` | `fit-station-profiles` | models (phase 2) |
+
+  The steps are deterministic: re-running one with the same code on the same input
+  reproduces the same output digest, so a new digest always means the data or the code changed.
 - **Changes to the data:** `data/processed/mibici/cleaning_report.json` lists, for every month,
   the rows and values each cleaning rule touched.
 

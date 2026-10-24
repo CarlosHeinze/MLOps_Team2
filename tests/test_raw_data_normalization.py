@@ -1,10 +1,15 @@
 import os
 from pathlib import Path
 
+import mlflow
+from mlflow.tracking import MlflowClient
 import pandas as pd
 import pytest
 
+from team2_mlops2026 import tracking
 from team2_mlops2026.data import raw_data_normalization as rdn
+from team2_mlops2026.data.raw_data_extraction import RAW_DATASET, raw_csv_files
+from team2_mlops2026.data.trip_data import trip_files
 
 HEADER = list(rdn.TRIP_COLUMNS)
 # Same trips in both date formats (day-first files have no seconds)
@@ -344,3 +349,30 @@ def test_normalize_in_parallel_processes(raw_dir, tmp_path):
 def test_normalize_empty_source(tmp_path):
     summary = rdn.normalize(tmp_path, tmp_path / "interim", workers=1)
     assert summary == {"found": 0, "skipped": 0, "normalized": [], "failed": []}
+
+
+# --- tracked run -------------------------------------------------------------
+
+
+def test_normalize_tracked_logs_raw_input_interim_outputs_and_formats(
+    raw_dir, tmp_path, mlflow_store
+):
+    dst = tmp_path / "interim"
+    summary = rdn.normalize_tracked(raw_dir, dst, workers=1)
+    run = mlflow.get_run(summary["mlflow_run_id"])
+
+    assert run.info.run_name == rdn.RUN_NAME and run.info.status == "FINISHED"
+    datasets = {i.dataset.name: i.dataset for i in run.inputs.dataset_inputs}
+    assert set(datasets) == {RAW_DATASET, "mibici_trips_interim", "mibici_stations"}
+    assert datasets[RAW_DATASET].digest == tracking.files_digest(raw_csv_files(raw_dir), raw_dir)
+    assert datasets["mibici_trips_interim"].digest == tracking.files_digest(
+        trip_files(dst), dst / "viajes"
+    )
+    metrics = run.data.metrics
+    assert metrics["files_normalized"] == 6
+    assert metrics["rows_normalized"] == 5 * 2 + 1  # five trip variants and one station
+    assert metrics["files_utf8"] + metrics["files_latin1"] == 6
+    assert metrics["files_datetime_iso"] == 4
+    assert metrics["files_datetime_day_first_no_seconds"] == 1
+    artifacts = [a.path for a in MlflowClient().list_artifacts(run.info.run_id)]
+    assert artifacts == ["normalized_files.json"]

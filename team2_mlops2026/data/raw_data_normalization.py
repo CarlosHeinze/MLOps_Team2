@@ -15,13 +15,17 @@ Output (typed Parquet), keeping the source data's naming:
     datos_abiertos_2016_01-1.csv -> viajes/2016/viajes_2016_01.parquet
     nomenclatura_2026_09.csv     -> estaciones/nomenclatura_2026_09.parquet
 
+Every CLI run is tracked in MLflow (``normalize_tracked``): the raw CSVs as input and the
+interim trips and stations as outputs, each with the same digest the neighbouring steps log, so
+the runs chain into one lineage. ``--no-track`` skips it.
+
 Usage (CLI):
     python -m team2_mlops2026.data.raw_data_normalization
     python -m team2_mlops2026.data.raw_data_normalization --force --workers 8
 
 Usage (notebook):
-    from team2_mlops2026.data.raw_data_normalization import normalize
-    summary = normalize()
+    from team2_mlops2026.data.raw_data_normalization import normalize_tracked
+    summary = normalize_tracked()
 """
 
 from __future__ import annotations
@@ -46,6 +50,7 @@ from team2_mlops2026.config import INTERIM_DATA_DIR, RAW_DATA_DIR
 RAW_MIBICI_DIR = RAW_DATA_DIR / "mibici"
 INTERIM_MIBICI_DIR = INTERIM_DATA_DIR / "mibici"
 DEFAULT_WORKERS = 4
+RUN_NAME = "normalize-raw-data"
 
 RAW_NAME_RE = re.compile(
     r"(datos_abiertos|nomenclatura)_(\d{4})_(\d{2})(?:-\d+)?\.csv", re.IGNORECASE
@@ -73,6 +78,8 @@ STATION_FLOAT_COLUMNS = ("latitude", "longitude")
 
 # Tried in order; a file must parse entirely with a single format
 DATETIME_FORMATS = ("%Y-%m-%d %H:%M:%S", "%d/%m/%Y %H:%M:%S", "%d/%m/%Y %H:%M")
+# Short names for MLflow metrics, which cannot contain "%" or "/"
+DATETIME_FORMAT_NAMES = dict(zip(DATETIME_FORMATS, ("iso", "day_first", "day_first_no_seconds")))
 
 app = typer.Typer()
 
@@ -300,14 +307,72 @@ def normalize(
     return summary
 
 
+def normalize_tracked(
+    src: str | Path = RAW_MIBICI_DIR,
+    dst: str | Path = INTERIM_MIBICI_DIR,
+    force: bool = False,
+    workers: int = DEFAULT_WORKERS,
+) -> dict:
+    """``normalize()`` inside an MLflow run of the project's experiment.
+
+    Logs the raw CSVs as input and the interim trips and latest stations as outputs, exactly
+    as the extraction and cleaning steps log them, so the digests match across runs. The
+    options are logged as params, the file and row counts as metrics (encodings and date
+    formats of the files normalized in this run) and the per-file report as artifact. The
+    summary gets ``mlflow_run_id``.
+    """
+    # Imported here: mlflow takes seconds to import and the worker processes never need it
+    import mlflow
+
+    from team2_mlops2026 import tracking
+    from team2_mlops2026.data.raw_data_extraction import RAW_DATASET, raw_csv_files
+    from team2_mlops2026.data.trip_data import latest_station_file, trip_files
+
+    src, dst = Path(src), Path(dst)
+    with tracking.start_run(RUN_NAME) as run:
+        tracking.log_files_dataset(raw_csv_files(src), src, RAW_DATASET, "raw")
+        mlflow.log_params({"force": force, "workers": workers})
+
+        summary = normalize(src, dst, force, workers)
+
+        tracking.log_files_dataset(
+            trip_files(dst), dst / "viajes", "mibici_trips_interim", "interim"
+        )
+        station_file = latest_station_file(dst)
+        tracking.log_dataset(
+            pd.read_parquet(station_file), station_file, "mibici_stations", "stations"
+        )
+        reports = summary["normalized"]
+        encodings = Counter(r["encoding"] for r in reports)
+        formats = Counter(r["datetime_format"] for r in reports if r["datetime_format"])
+        mlflow.log_metrics(
+            {
+                "files_found": summary["found"],
+                "files_skipped": summary["skipped"],
+                "files_normalized": len(reports),
+                "files_failed": len(summary["failed"]),
+                "rows_normalized": sum(r["rows"] for r in reports),
+                **{f"files_{enc.replace('-', '')}": n for enc, n in encodings.items()},
+                **{f"files_datetime_{DATETIME_FORMAT_NAMES[f]}": n for f, n in formats.items()},
+            }
+        )
+        if reports:
+            mlflow.log_dict(reports, "normalized_files.json")
+        if summary["failed"]:
+            mlflow.log_dict(summary["failed"], "failed_files.json")
+    summary["mlflow_run_id"] = run.info.run_id
+    return summary
+
+
 @app.command()
 def main(
     src: Annotated[Path, typer.Option(help="Source raw folder")] = RAW_MIBICI_DIR,
     dst: Annotated[Path, typer.Option(help="Destination interim folder")] = INTERIM_MIBICI_DIR,
     force: Annotated[bool, typer.Option(help="Re-normalize even if up to date")] = False,
     workers: Annotated[int, typer.Option(help="Parallel processes")] = DEFAULT_WORKERS,
+    track: Annotated[bool, typer.Option(help="Log the run to the MLflow server")] = True,
 ):
-    summary = normalize(src, dst, force, workers)
+    summary = (normalize_tracked if track else normalize)(src, dst, force, workers)
     raise typer.Exit(code=1 if summary["failed"] else 0)
 
 
