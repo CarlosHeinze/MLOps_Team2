@@ -3,50 +3,10 @@ import os
 
 import pandas as pd
 import pytest
+from trip_factory import BY, START, STATIONS, make_trips
 
 from team2_mlops2026.data import interim_data_cleaning as idc
-from team2_mlops2026.data.raw_data_normalization import TRIP_COLUMNS
-
-BY = idc.BIRTH_YEAR
-START = pd.Timestamp("2024-03-10 08:00:00")
-
-# Station 2 is ~1.0 km north of station 1; station 99 is not in the nomenclature
-STATIONS = pd.DataFrame(
-    {
-        "id": pd.array([1, 2], dtype="Int64"),
-        "name": ["A", "B"],
-        "latitude": [20.0, 20.009],
-        "longitude": [-103.0, -103.0],
-        "dpcapacity": pd.array([10, 10], dtype="Int64"),
-    }
-)
-
-
-def make_trips(*rows: dict) -> pd.DataFrame:
-    """Trips frame with the interim schema; every row defaults to a valid 10 min trip."""
-    records = []
-    for i, row in enumerate(rows):
-        seconds = row.pop("seconds", 600)
-        start = row.pop("start", START)
-        records.append(
-            {
-                "Viaje_Id": i + 1,
-                "Usuario_Id": 7,
-                "Genero": "M",
-                BY: 1990,
-                "Inicio_del_viaje": start,
-                "Fin_del_viaje": start + pd.Timedelta(seconds=seconds),
-                "Origen_Id": 1,
-                "Destino_Id": 2,
-                **row,
-            }
-        )
-    df = pd.DataFrame(records, columns=list(TRIP_COLUMNS))
-    for col in ("Viaje_Id", "Usuario_Id", BY, "Origen_Id", "Destino_Id"):
-        df[col] = df[col].astype("Int64")
-    for col in ("Inicio_del_viaje", "Fin_del_viaje"):
-        df[col] = df[col].astype("datetime64[ms]")
-    return df
+from team2_mlops2026.data.trip_data import trip_metrics
 
 
 @pytest.fixture
@@ -65,32 +25,6 @@ def interim_dir(tmp_path):
     return src
 
 
-# --- metrics -----------------------------------------------------------------
-
-
-def test_haversine_one_hundredth_degree_of_latitude():
-    assert idc.haversine_km(20.0, -103.0, 20.01, -103.0) == pytest.approx(1.112, abs=1e-3)
-
-
-def test_trip_metrics_values():
-    metrics = idc.trip_metrics(make_trips({"seconds": 360}), STATIONS)
-    row = metrics.iloc[0]
-    assert row["duration_s"] == 360
-    assert row["distance_km"] == pytest.approx(1.0, abs=0.01)
-    assert row["speed_kmh"] == pytest.approx(10.0, abs=0.1)
-    assert row["age"] == 34
-
-
-def test_trip_metrics_unknown_station_and_zero_duration_are_nan():
-    metrics = idc.trip_metrics(make_trips({"Destino_Id": 99}, {"seconds": 0}), STATIONS)
-    assert pd.isna(metrics.loc[0, "distance_km"]) and pd.isna(metrics.loc[0, "speed_kmh"])
-    assert pd.isna(metrics.loc[1, "speed_kmh"])
-
-
-def test_trip_metrics_missing_birth_year_gives_nan_age():
-    assert pd.isna(idc.trip_metrics(make_trips({BY: None}), STATIONS).loc[0, "age"])
-
-
 # --- rules -------------------------------------------------------------------
 
 
@@ -103,7 +37,7 @@ def test_trip_metrics_missing_birth_year_gives_nan_age():
     ],
 )
 def test_trip_violations_flag_each_rule(row, rule):
-    broken = idc.trip_violations(idc.trip_metrics(make_trips(row), STATIONS))
+    broken = idc.trip_violations(trip_metrics(make_trips(row), STATIONS))
     assert broken.loc[0, rule] and broken.loc[0].sum() == 1
 
 
@@ -113,7 +47,7 @@ def test_trip_violations_accept_bounds_and_unknown_stations():
         {"seconds": idc.MAX_DURATION_S},
         {"seconds": 61, "Destino_Id": 99},  # speed unknown -> cannot be proven wrong
     )
-    assert not idc.trip_violations(idc.trip_metrics(trips, STATIONS)).to_numpy().any()
+    assert not idc.trip_violations(trip_metrics(trips, STATIONS)).to_numpy().any()
 
 
 @pytest.mark.parametrize(
@@ -142,7 +76,7 @@ def test_field_violations_ignore_missing_values_and_bounds():
 def test_rule_violations_has_every_rule():
     trips = make_trips({}, {})
     trips.iloc[1] = trips.iloc[0]
-    broken = idc.rule_violations(trips, idc.trip_metrics(trips, STATIONS))
+    broken = idc.rule_violations(trips, trip_metrics(trips, STATIONS))
     assert list(broken.columns) == ["duplicate", *idc.TRIP_RULES, *idc.FIELD_RULES]
     assert broken["duplicate"].tolist() == [False, True]
 
@@ -272,12 +206,6 @@ def test_validate_rejects_contract_breaks(trips, message):
 
 # --- clean -------------------------------------------------------------------
 
-
-def test_load_trips_reads_every_month_as_category(interim_dir):
-    trips = idc.load_trips(interim_dir, ["Usuario_Id", "Genero"])
-    assert list(trips.columns) == ["Usuario_Id", "Genero"]
-    assert len(trips) == 5
-    assert trips["Genero"].dtype == "category"
 
 
 def test_clean_writes_layout_and_report(interim_dir, tmp_path):

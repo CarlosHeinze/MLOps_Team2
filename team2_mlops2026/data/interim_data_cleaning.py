@@ -1,7 +1,7 @@
 """
 Value cleaning of MiBici trips: data/interim/mibici/ -> data/processed/mibici/
 
-The rules come from the data contract tests in notebook ``1.02-team2-eda-and-data-cleaning``:
+The rules come from the data contract tests in notebook ``1.02-team2-data-cleaning``:
 - Exact duplicate rows are removed; ``Viaje_Id`` must then be unique.
 - Rows that are not real trips are removed: under 60 s (false starts / re-docks, the
   Divvy and Citi Bike convention), over 24 h (bike not docked) or faster than 30 km/h
@@ -28,7 +28,6 @@ Usage (notebook):
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -37,25 +36,26 @@ from pathlib import Path
 from typing import Annotated
 
 from loguru import logger
-import numpy as np
 import pandas as pd
-import pyarrow as pa
-import pyarrow.dataset as ds
-import pyarrow.parquet as pq
 from tqdm import tqdm
 import typer
 
-from team2_mlops2026.config import PROCESSED_DATA_DIR
 from team2_mlops2026.data.raw_data_normalization import INTERIM_MIBICI_DIR, TRIP_COLUMNS
+from team2_mlops2026.data.trip_data import (
+    BIRTH_YEAR,
+    DEMOGRAPHIC_COLUMNS,
+    PROCESSED_MIBICI_DIR,
+    REQUIRED_COLUMNS,
+    age_at_trip,
+    latest_station_file,
+    load_trips,
+    trip_files,
+    trip_metrics,
+)
 
-PROCESSED_MIBICI_DIR = PROCESSED_DATA_DIR / "mibici"
 REPORT_NAME = "cleaning_report.json"
 DEFAULT_WORKERS = 4
 
-BIRTH_YEAR = "Año_de_nacimiento"
-DEMOGRAPHIC_COLUMNS = ("Genero", BIRTH_YEAR)
-# Every other column identifies the trip and may never be null
-REQUIRED_COLUMNS = tuple(c for c in TRIP_COLUMNS if c not in DEMOGRAPHIC_COLUMNS)
 # Enough to build user profiles without loading the whole history
 PROFILE_COLUMNS = ("Usuario_Id", "Genero", BIRTH_YEAR, "Inicio_del_viaje")
 
@@ -68,8 +68,6 @@ MIN_AGE, MAX_AGE = 16, 90  # MiBici registers riders from 16; older ages are pla
 
 TRIP_RULES = ("too_short", "too_long", "too_fast")  # the row is not a real trip -> drop it
 FIELD_RULES = {"invalid_gender": "Genero", "invalid_age": BIRTH_YEAR}  # only the value is wrong
-
-EARTH_RADIUS_KM = 6371.0088
 
 app = typer.Typer()
 
@@ -105,80 +103,6 @@ class CleaningLog:
 def _record(log, step, detail, before: pd.DataFrame, after: pd.DataFrame, cells: int = 0):
     if log is not None:
         log.record(step, detail, len(before), len(after), cells)
-
-
-# --- loading -----------------------------------------------------------------
-
-
-def trip_files(src: str | Path = INTERIM_MIBICI_DIR) -> list[Path]:
-    return sorted((Path(src) / "viajes").rglob("viajes_*.parquet"))
-
-
-def latest_station_file(src: str | Path = INTERIM_MIBICI_DIR) -> Path:
-    files = sorted((Path(src) / "estaciones").glob("nomenclatura_*.parquet"))
-    if not files:
-        raise FileNotFoundError(f"No station nomenclature under {src}")
-    return files[-1]
-
-
-def load_trips(
-    src: str | Path = INTERIM_MIBICI_DIR, columns: Sequence[str] | None = None
-) -> pd.DataFrame:
-    """Every month under ``src`` in one frame, with ``Genero`` as category to save memory."""
-    files = [str(p) for p in trip_files(src)]
-    # A month whose column is all null stores it as type null; unify instead of failing
-    schema = pa.unify_schemas([pq.read_schema(f) for f in files], promote_options="permissive")
-    df = ds.dataset(files, schema=schema, format="parquet")
-    df = df.to_table(columns=columns and list(columns)).to_pandas()
-    if "Genero" in df:
-        df["Genero"] = df["Genero"].astype("category")
-    return df
-
-
-def load_stations(src: str | Path = INTERIM_MIBICI_DIR) -> pd.DataFrame:
-    """Latest station nomenclature (MiBici only publishes the current one)."""
-    return pd.read_parquet(latest_station_file(src))
-
-
-# --- derived quantities ------------------------------------------------------
-
-
-def haversine_km(lat1, lon1, lat2, lon2) -> np.ndarray:
-    lat1, lon1, lat2, lon2 = map(np.radians, (lat1, lon1, lat2, lon2))
-    h = (
-        np.sin((lat2 - lat1) / 2) ** 2
-        + np.cos(lat1) * np.cos(lat2) * np.sin((lon2 - lon1) / 2) ** 2
-    )
-    return 2 * EARTH_RADIUS_KM * np.arcsin(np.sqrt(h))
-
-
-def age_at_trip(trips: pd.DataFrame) -> pd.Series:
-    return trips["Inicio_del_viaje"].dt.year - trips[BIRTH_YEAR]
-
-
-def trip_metrics(trips: pd.DataFrame, stations: pd.DataFrame) -> pd.DataFrame:
-    """Quantities the contract is written on: duration, distance, speed and age.
-
-    Distance is the straight line between stations, so distance and speed are lower bounds
-    of the real ones; both are NaN for stations missing from the nomenclature.
-    """
-    duration_s = (trips["Fin_del_viaje"] - trips["Inicio_del_viaje"]).dt.total_seconds()
-    coords = stations.set_index("id")[["latitude", "longitude"]].astype("float64")
-    origin = coords.reindex(trips["Origen_Id"].to_numpy("int64", na_value=-1)).to_numpy()
-    dest = coords.reindex(trips["Destino_Id"].to_numpy("int64", na_value=-1)).to_numpy()
-    distance_km = haversine_km(origin[:, 0], origin[:, 1], dest[:, 0], dest[:, 1])
-    hours = duration_s.to_numpy() / 3600
-    with np.errstate(divide="ignore", invalid="ignore"):
-        speed_kmh = np.where(hours > 0, distance_km / hours, np.nan)
-    return pd.DataFrame(
-        {
-            "duration_s": duration_s.to_numpy(),
-            "distance_km": distance_km,
-            "speed_kmh": speed_kmh,
-            "age": age_at_trip(trips).astype("float64").to_numpy(),
-        },
-        index=trips.index,
-    ).astype("float32")
 
 
 # --- contract rules ----------------------------------------------------------
