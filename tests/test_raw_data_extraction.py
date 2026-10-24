@@ -3,9 +3,12 @@ import json
 import threading
 import time
 
+import mlflow
+from mlflow.tracking import MlflowClient
 import pytest
 import requests
 
+from team2_mlops2026 import tracking
 from team2_mlops2026.data import raw_data_extraction as rde
 
 TRIPS_URL = "https://mibici.net/site/assets/files/1/datos_abiertos_2024_01.csv"
@@ -370,3 +373,49 @@ def test_ingest_records_failures_and_keeps_going(tmp_path, site):
     assert len(summary["new"]) == 2
     manifest = rde.load_manifest(tmp_path / rde.MANIFEST_NAME)
     assert "datos_abiertos_2024_01.csv" not in manifest
+
+
+# --- tracked run -------------------------------------------------------------
+
+
+def test_raw_csv_files_leave_out_manifest_partial_and_unknown_files(tmp_path, site):
+    rde.ingest(out=tmp_path, session_factory=lambda: FakeSession(site))
+    (tmp_path / "datos_abiertos_2024_02.csv.part").write_bytes(b"half a download")
+    (tmp_path / "notes.csv").write_text("not MiBici")
+
+    assert [p.name for p in rde.raw_csv_files(tmp_path)] == [
+        "datos_abiertos_2016_01-1.csv",
+        "datos_abiertos_2024_01.csv",
+        "nomenclatura_2024_01.csv",
+    ]
+
+
+def test_ingest_tracked_logs_raw_dataset_options_and_manifest(tmp_path, site, mlflow_store):
+    out = tmp_path / "raw"
+    summary = rde.ingest_tracked(out, since="2016-01", session_factory=lambda: FakeSession(site))
+    run = mlflow.get_run(summary["mlflow_run_id"])
+
+    assert run.info.run_name == rde.RUN_NAME and run.info.status == "FINISHED"
+    (logged,) = run.inputs.dataset_inputs
+    files = rde.raw_csv_files(out)
+    assert logged.dataset.name == rde.RAW_DATASET
+    assert logged.dataset.digest == tracking.files_digest(files, out)
+    assert run.data.params["since"] == "2016-01"
+    assert run.data.metrics["files_downloaded"] == 3
+    assert run.data.metrics["raw_bytes"] == sum(p.stat().st_size for p in files)
+    artifacts = [a.path for a in MlflowClient().list_artifacts(run.info.run_id)]
+    assert artifacts == [rde.MANIFEST_NAME]
+
+
+def test_ingest_tracked_digest_changes_only_when_a_file_changes(tmp_path, site, mlflow_store):
+    out = tmp_path / "raw"
+
+    def digest(summary):
+        return mlflow.get_run(summary["mlflow_run_id"]).inputs.dataset_inputs[0].dataset.digest
+
+    first = rde.ingest_tracked(out, session_factory=lambda: FakeSession(site))
+    again = rde.ingest_tracked(out, session_factory=lambda: FakeSession(site))  # nothing new
+    site[TRIPS_URL] = FakeResponse(b"Viaje_Id\n1\n2\n9\n")  # MiBici re-publishes a month
+    republished = rde.ingest_tracked(out, force=True, session_factory=lambda: FakeSession(site))
+
+    assert digest(again) == digest(first) != digest(republished)
