@@ -5,6 +5,13 @@ data/raw/*
 !data/raw/.gitkeep
 data/interim/*
 !data/interim/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+
+# MLflow local tracking server (backend store and artifacts)
+mlflow.db
+mlruns/
+mlartifacts/
 
 # Mac OS-specific storage files
 .DS_Store

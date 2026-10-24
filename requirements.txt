@@ -4,6 +4,7 @@ jupyterlab
 loguru
 matplotlib
 mkdocs
+mlflow
 notebook
 numpy
 pandas
@@ -14,6 +15,7 @@ python-dotenv
 requests
 ruff
 scikit-learn
+scipy
 tqdm
 typer
 -e .
