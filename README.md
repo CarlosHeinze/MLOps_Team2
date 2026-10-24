@@ -125,8 +125,6 @@ make lint    # ruff format --check + ruff check
 - **Changes to the data:** `data/processed/mibici/cleaning_report.json` lists, for every month,
   the rows and values each cleaning rule touched.
 
-![MLflow run of the feature step](reports/figures/1.04-mlflow-features-run.png)
-
 ## Project Organization
 
 ```
@@ -149,7 +147,7 @@ make lint    # ruff format --check + ruff check
 ├── pyproject.toml     <- Package metadata and ruff configuration
 ├── references         <- ml-canvas.md: requirements analysis and value proposition
 ├── reports
-│   └── figures        <- Figures and screenshots for reports and presentations
+│   └── figures        <- Figures for reports and presentations
 ├── requirements.txt   <- Python dependencies (installs this package with `-e .`)
 ├── tests              <- pytest suite, one module per source module
 │
