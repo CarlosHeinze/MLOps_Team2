@@ -3,6 +3,8 @@ data/external/*
 !data/external/.gitkeep
 data/raw/*
 !data/raw/.gitkeep
+data/interim/*
+!data/interim/.gitkeep
 
 # Mac OS-specific storage files
 .DS_Store
