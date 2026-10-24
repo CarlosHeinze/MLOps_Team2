@@ -11,6 +11,10 @@ in ``raw_data_normalization.py``.
 - Keeps a ``manifest.json`` with source URL, sha256, size and download date
   (lineage for DVC / later validations).
 
+Every CLI run is tracked in MLflow (``ingest_tracked``): the raw CSVs as a dataset with a
+digest of their contents, the options as params and the download counts as metrics. It needs
+the tracking server running; ``--no-track`` skips it (``--dry-run`` never tracks).
+
 Usage (CLI):
     python -m team2_mlops2026.data.raw_data_extraction                    # everything missing
     python -m team2_mlops2026.data.raw_data_extraction --since 2024-01    # only from that month
@@ -18,8 +22,8 @@ Usage (CLI):
     python -m team2_mlops2026.data.raw_data_extraction --dry-run          # list only
 
 Usage (notebook):
-    from team2_mlops2026.data.raw_data_extraction import ingest
-    summary = ingest(since="2024-01")
+    from team2_mlops2026.data.raw_data_extraction import ingest_tracked
+    summary = ingest_tracked(since="2024-01")
 """
 
 from __future__ import annotations
@@ -53,6 +57,8 @@ FALLBACK_PAGE_URL = "https://mibici.net/en/open-data/"
 RAW_MIBICI_DIR = RAW_DATA_DIR / "mibici"
 MANIFEST_NAME = "manifest.json"
 DEFAULT_WORKERS = 4
+RUN_NAME = "extract-raw-data"
+RAW_DATASET = "mibici_raw"  # MLflow name of the raw CSVs, shared with the normalization step
 
 # Only recognizes MiBici CSVs and their period (for --since); does not rename anything.
 CSV_RE = re.compile(
@@ -262,6 +268,61 @@ def ingest(
     return summary
 
 
+def raw_csv_files(folder: str | Path = RAW_MIBICI_DIR) -> list[Path]:
+    """The MiBici CSVs in ``folder``: the raw dataset, without the manifest or partial files."""
+    return sorted(p for p in Path(folder).glob("*.csv") if CSV_RE.fullmatch(p.name))
+
+
+def ingest_tracked(
+    out: str | Path = RAW_MIBICI_DIR,
+    since: str | None = None,
+    force: bool = False,
+    workers: int = DEFAULT_WORKERS,
+    session_factory: Callable[[], requests.Session] = make_session,
+) -> dict:
+    """``ingest()`` inside an MLflow run of the project's experiment.
+
+    Logs every raw CSV in ``out`` after the download as the output dataset (a digest of their
+    contents, so a re-published month shows up as a new version), the options as params, the
+    download counts as metrics and ``manifest.json`` as artifact. The summary gets
+    ``mlflow_run_id``.
+    """
+    # Imported here: mlflow takes seconds to import and the plain CLI never needs it
+    import mlflow
+
+    from team2_mlops2026 import tracking
+
+    out = Path(out)
+    with tracking.start_run(RUN_NAME) as run:
+        mlflow.log_params(
+            {
+                "source_page": os.environ.get("MIBICI_PAGE_URL", PAGE_URL),
+                "since": since or "all",
+                "force": force,
+                "workers": workers,
+            }
+        )
+        summary = ingest(out, since, force, False, workers, session_factory)
+        files = raw_csv_files(out)
+        tracking.log_files_dataset(files, out, RAW_DATASET, "raw")
+        mlflow.log_metrics(
+            {
+                "files_discovered": summary["discovered"],
+                "files_selected": summary["selected"],
+                "files_skipped": summary["skipped"],
+                "files_downloaded": len(summary["new"]),
+                "files_failed": len(summary["failed"]),
+                "raw_files": len(files),
+                "raw_bytes": sum(p.stat().st_size for p in files),
+            }
+        )
+        mlflow.log_artifact(summary["manifest_path"])
+        if summary["failed"]:
+            mlflow.log_dict(summary["failed"], "failed_files.json")
+    summary["mlflow_run_id"] = run.info.run_id
+    return summary
+
+
 @app.command()
 def main(
     out: Annotated[Path, typer.Option(help="Destination raw folder")] = RAW_MIBICI_DIR,
@@ -271,8 +332,12 @@ def main(
     force: Annotated[bool, typer.Option(help="Re-download even if it exists")] = False,
     dry_run: Annotated[bool, typer.Option(help="Only list what would be downloaded")] = False,
     workers: Annotated[int, typer.Option(help="Parallel downloads")] = DEFAULT_WORKERS,
+    track: Annotated[bool, typer.Option(help="Log the run to the MLflow server")] = True,
 ):
-    summary = ingest(out, since, force, dry_run, workers)
+    if track and not dry_run:
+        summary = ingest_tracked(out, since, force, workers)
+    else:
+        summary = ingest(out, since, force, dry_run, workers)
     raise typer.Exit(code=1 if summary["failed"] else 0)
 
 
