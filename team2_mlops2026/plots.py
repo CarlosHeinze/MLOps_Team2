@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 import matplotlib as mpl
+from matplotlib import font_manager
 from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.pyplot as plt
 import numpy as np
@@ -27,6 +28,15 @@ SEQUENTIAL = LinearSegmentedColormap.from_list(
 DIVERGING = LinearSegmentedColormap.from_list(
     "diverging_blue_red", ["#184f95", "#3987e5", "#f0efec", "#e66767", "#a32a2a"]
 )
+
+# In order of preference. Segoe UI only ships with Windows; DejaVu Sans ships with matplotlib.
+FONTS = ("Segoe UI", "DejaVu Sans")
+
+
+def _installed_fonts() -> list[str]:
+    """``FONTS`` that exist here: a missing one logs a "findfont" warning for every text."""
+    installed = {font.name for font in font_manager.fontManager.ttflist}
+    return [font for font in FONTS if font in installed]
 
 
 def use_style() -> None:
@@ -51,7 +61,7 @@ def use_style() -> None:
             "ytick.color": MUTED,
             "legend.frameon": False,
             "lines.linewidth": 2,
-            "font.family": ["Segoe UI", "DejaVu Sans", "sans-serif"],
+            "font.family": [*_installed_fonts(), "sans-serif"],
         }
     )
 
