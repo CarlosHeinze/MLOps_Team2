@@ -123,3 +123,11 @@ def test_charts_render(frame):
     ]
     assert all(isinstance(f, matplotlib.figure.Figure) for f in figures)
     matplotlib.pyplot.close("all")
+
+
+def test_style_only_requests_installed_fonts(caplog):
+    plots.use_style()
+    with caplog.at_level("WARNING", logger="matplotlib.font_manager"):
+        plots.plot_heatmap(pd.DataFrame([[1.0, 2.0]]), "annotated")
+        matplotlib.pyplot.close("all")
+    assert "findfont" not in caplog.text
