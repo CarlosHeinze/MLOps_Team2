@@ -6,6 +6,12 @@
 
 Project for MLOps Course for the Master in Applied AI from Tec de Monterrey
 
+## Problem and value proposition
+
+We forecast hourly bike demand per MiBici station so the operator can rebalance bikes before
+stations run empty or full. See the [ML Canvas](references/ml-canvas.md) for the full
+requirements analysis.
+
 ## Project Organization
 
 ```
