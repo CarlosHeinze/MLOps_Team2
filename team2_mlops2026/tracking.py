@@ -40,7 +40,7 @@ def check_tracking_server(uri: str | None = None) -> None:
     except requests.RequestException as exc:
         raise RuntimeError(
             f"MLflow tracking server not reachable at {uri}. Start it from the project root with:\n"
-            "    mlflow server --host 127.0.0.1 --port 5000"
+            "    make mlflow  # or start a server matching MLFLOW_TRACKING_URI"
         ) from exc
 
 
@@ -56,8 +56,8 @@ def start_run(run_name: str | None = None):
         raise RuntimeError(
             "`mlflow run` is not using the MLflow server. Set the tracking URI in this terminal "
             "and run it again:\n"
-            '    PowerShell:   $env:MLFLOW_TRACKING_URI = "http://127.0.0.1:5000"\n'
-            "    macOS/Linux:  export MLFLOW_TRACKING_URI=http://127.0.0.1:5000"
+            '    PowerShell:   $env:MLFLOW_TRACKING_URI = "http://127.0.0.1:5001"\n'
+            "    macOS/Linux:  export MLFLOW_TRACKING_URI=http://127.0.0.1:5001"
         )
     if under_mlflow_run:
         check_tracking_server(mlflow.get_tracking_uri())

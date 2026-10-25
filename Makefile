@@ -3,8 +3,9 @@
 #################################################################################
 
 PROJECT_NAME = team2_mlops2026
-PYTHON_VERSION = 3.10
-PYTHON_INTERPRETER = python
+PYTHON_VERSION = 3.12
+PYTHON_INTERPRETER ?= .venv/bin/python
+MLFLOW_PORT ?= 5001
 
 #################################################################################
 # COMMANDS                                                                      #
@@ -14,7 +15,6 @@ PYTHON_INTERPRETER = python
 ## Install Python dependencies
 .PHONY: requirements
 requirements:
-	$(PYTHON_INTERPRETER) -m pip install -U pip
 	$(PYTHON_INTERPRETER) -m pip install -r requirements.txt
 	
 
@@ -30,28 +30,28 @@ clean:
 ## Lint using ruff (use `make format` to do formatting)
 .PHONY: lint
 lint:
-	ruff format --check
-	ruff check
+	$(PYTHON_INTERPRETER) -m ruff format --check
+	$(PYTHON_INTERPRETER) -m ruff check
 
 ## Format source code with ruff
 .PHONY: format
 format:
-	ruff check --fix
-	ruff format
+	$(PYTHON_INTERPRETER) -m ruff check --fix
+	$(PYTHON_INTERPRETER) -m ruff format
 
 
 
 ## Run tests
 .PHONY: test
 test:
-	python -m pytest tests
+	$(PYTHON_INTERPRETER) -m pytest tests
 
 
 ## Set up Python interpreter environment
 .PHONY: create_environment
 create_environment:
-	@bash -c "if [ ! -z `which virtualenvwrapper.sh` ]; then source `which virtualenvwrapper.sh`; mkvirtualenv $(PROJECT_NAME) --python=$(PYTHON_INTERPRETER); else mkvirtualenv.bat $(PROJECT_NAME) --python=$(PYTHON_INTERPRETER); fi"
-	@echo ">>> New virtualenv created. Activate with:\nworkon $(PROJECT_NAME)"
+	python$(PYTHON_VERSION) -m venv .venv
+	@echo "Activate with: source .venv/bin/activate"
 	
 
 
@@ -61,10 +61,18 @@ create_environment:
 #################################################################################
 
 
-## Make dataset
+## Start the local MLflow server (copy .env.example to .env first)
+.PHONY: mlflow
+mlflow:
+	$(PYTHON_INTERPRETER) -m mlflow server --host 127.0.0.1 --port $(MLFLOW_PORT)
+
+
+## Build raw, interim, and cleaned data (downloads the full MiBici history)
 .PHONY: data
-data: requirements
-	$(PYTHON_INTERPRETER) team2_mlops2026/dataset.py
+data:
+	$(PYTHON_INTERPRETER) -m team2_mlops2026.data.raw_data_extraction
+	$(PYTHON_INTERPRETER) -m team2_mlops2026.data.raw_data_normalization
+	$(PYTHON_INTERPRETER) -m team2_mlops2026.data.interim_data_cleaning
 
 
 #################################################################################
@@ -83,4 +91,4 @@ endef
 export PRINT_HELP_PYSCRIPT
 
 help:
-	@$(PYTHON_INTERPRETER) -c "${PRINT_HELP_PYSCRIPT}" < $(MAKEFILE_LIST)
+	@python$(PYTHON_VERSION) -c "${PRINT_HELP_PYSCRIPT}" < $(MAKEFILE_LIST)

@@ -16,6 +16,11 @@ The data is the [MiBici open data](https://mibici.net/en/open-data/): every trip
 Guadalajara public bike system since December 2014, published as one CSV per month, plus the
 current station list.
 
+Phase 1 handoff: [presentation material](docs/fase1-presentacion-julian.md),
+[functional roles](docs/roles.md), [AI usage declaration](docs/ai-usage.md), and
+[Julian's local verification](docs/verificacion-fase1-julian.md). The presentation material
+distinguishes results reported in earlier PRs from checks performed on this branch.
+
 ## Pipeline
 
 Each step is a module with a CLI, and a notebook that explains and checks its decisions. A step
@@ -45,10 +50,19 @@ Requirements:
 ### 1. Environment
 
 ```bash
-python3.12 -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
-pip install -r requirements.txt    # also installs this package in editable mode
+make create_environment            # requires Python 3.12
+make requirements                  # installs into .venv; no implicit pip upgrade
+cp .env.example .env               # local MLflow settings; .env is git-ignored
 ```
+
+The `Makefile` uses `.venv/bin/python` by default. If you manage a separate Python 3.12
+environment, pass `PYTHON_INTERPRETER=/path/to/python` to `make` instead.
+`requirements.txt` pins every direct dependency to the versions installed in the local
+Python 3.12 environment used for this branch's unit suite. The pandas, pyarrow, MLflow
+and scikit-learn pins also match the combination reported as working in issue
+[#12](https://github.com/CarlosHeinze/MLOps_Team2/issues/12). Transitive dependencies
+are resolved by pip and are not locked; a full clean-machine/full-data reproduction
+still needs verification by a teammate with the historical data.
 
 ### 2. MLflow tracking server
 
@@ -56,27 +70,30 @@ Start it from the project root and leave it running; the tracking database (`mlf
 artifacts (`mlartifacts/`) stay local and are git-ignored.
 
 ```bash
-mlflow server --host 127.0.0.1 --port 5000
+make mlflow
 ```
 
-> **macOS:** AirPlay Receiver already listens on port 5000 and answers 403, so the pipeline
-> stops with "MLflow tracking server not reachable". Start the server on another port, for
-> example `--port 5001`, and point the project to it in a `.env` file at the project root
-> (git-ignored):
->
-> ```bash
-> MLFLOW_TRACKING_URI=http://127.0.0.1:5001
-> ```
+The default is `127.0.0.1:5001` to avoid the macOS AirPlay Receiver on port 5000.
+`make mlflow MLFLOW_PORT=...` and `MLFLOW_TRACKING_URI` in `.env` must agree if you use
+another port. Keep the server terminal open while running tracked steps. The database and
+artifacts remain local and are not a shared record for other teammates.
 
 ### 3. Data pipeline
 
+`make data` runs extraction → normalization → cleaning. It downloads the full MiBici
+history (about 3 GB of raw CSVs and about 5 GB across pipeline stages). It does not
+install dependencies. Run it only when that download and disk use are intended.
+
 ```bash
-python -m team2_mlops2026.data.raw_data_extraction         # MLflow run: extract-raw-data (~3 GB)
-python -m team2_mlops2026.data.raw_data_normalization      # MLflow run: normalize-raw-data
-python -m team2_mlops2026.data.interim_data_cleaning       # MLflow run: clean-interim-trips
-python -m team2_mlops2026.features                         # MLflow run: build-station-hour-features
-python -m team2_mlops2026.station_profiles                 # MLflow run: fit-station-profiles
+make data
+.venv/bin/python -m team2_mlops2026.features
+.venv/bin/python -m team2_mlops2026.station_profiles
 ```
+
+For a smaller extraction, use the extraction CLI with `--since YYYY-MM`, then run the
+subsequent modules separately. These commands have not been validated on a partial
+history; the full-history notebook totals will not match it. `--no-track` permits an
+individual step without the MLflow server.
 
 Every step is idempotent and has `--help`. Useful options:
 
@@ -113,7 +130,7 @@ Run them in order: `0.01` → `1.01` → `1.02` → `1.03` → `1.04` → `1.05`
 ### 5. Tests and lint
 
 ```bash
-make test    # pytest: unit tests on small synthetic data, no network or MLflow server needed
+make test    # pytest: unit tests on small synthetic data, no historical dataset needed
 make lint    # ruff format --check + ruff check
 ```
 
@@ -147,7 +164,7 @@ make lint    # ruff format --check + ruff check
 ## Project Organization
 
 ```
-├── Makefile           <- `make requirements`, `make test`, `make lint`
+├── Makefile           <- environment, local MLflow, pipeline, tests, lint
 ├── README.md
 ├── data               <- Git-ignored; rebuilt by the pipeline
 │   ├── raw            <- MiBici CSVs exactly as published, plus manifest.json
@@ -183,6 +200,6 @@ make lint    # ruff format --check + ruff check
     ├── station_profiles.py  <- Step 6: station usage profiles reduced with PCA
     ├── plots.py       <- Charts used by the notebooks
     ├── tracking.py    <- MLflow helpers: runs and dataset logging with digests
-    ├── dataset.py     <- Cookiecutter placeholder (not used)
+    ├── dataset.py     <- Legacy Cookiecutter placeholder; `make data` uses the real modules
     └── modeling       <- Cookiecutter placeholders for training and prediction (phase 2)
 ```

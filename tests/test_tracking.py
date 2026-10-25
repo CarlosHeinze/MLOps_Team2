@@ -51,7 +51,7 @@ def test_check_tracking_server_explains_how_to_start_it(monkeypatch):
         raise requests.ConnectionError("refused")
 
     monkeypatch.setattr(requests, "get", refuse)
-    with pytest.raises(RuntimeError, match="mlflow server --host 127.0.0.1 --port 5000"):
+    with pytest.raises(RuntimeError, match="make mlflow"):
         tracking.check_tracking_server("http://127.0.0.1:5000")
 
 

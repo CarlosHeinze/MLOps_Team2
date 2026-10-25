@@ -19,7 +19,7 @@ plus ``cleaning_report.json`` with the rows each step touched per file (lineage)
 
 Every CLI run is tracked in MLflow (``clean_tracked``): datasets with their digests, the
 contract as params and the cleaning totals as metrics. It needs the tracking server running
-(``mlflow server --host 127.0.0.1 --port 5000``); ``--no-track`` skips it.
+(``make mlflow`` from the project root); ``--no-track`` skips it.
 
 Usage (CLI):
     python -m team2_mlops2026.data.interim_data_cleaning
