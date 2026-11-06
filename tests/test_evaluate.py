@@ -158,11 +158,17 @@ def test_each_fold_trains_on_the_past_and_tests_on_its_month(table):
         assert len(train) + len(test) == (table[TIME] < fold.test_end).sum()
 
 
-def test_folds_need_data_before_the_first_and_up_to_the_last_month(table):
+def test_folds_need_data_before_the_first_and_in_every_test_month(table):
     with pytest.raises(ValueError, match="No training hours"):
         ev.rolling_origin_splits(table, first_test_month="2025-01")
-    with pytest.raises(ValueError, match="before the last test month"):
+    with pytest.raises(ValueError, match="No training hours"):
+        ev.rolling_origin_splits(table.iloc[:0])
+    with pytest.raises(ValueError, match="test months 2026-10, 2026-11, 2026-12"):
         ev.rolling_origin_splits(table, first_test_month="2026-01", n_folds=12)
+
+    gap = table[table[TIME].dt.to_period("M") != pd.Period("2026-02", freq="M")]
+    with pytest.raises(ValueError, match="test months 2026-02$"):
+        ev.rolling_origin_splits(gap)
 
 
 # --- success criterion ---------------------------------------------------------
@@ -189,3 +195,9 @@ def test_success_fails_if_any_demand_group_is_worse_than_the_baseline():
 def test_groups_with_undefined_wape_are_not_compared():
     baselines = {"historical_average": report(0.30, np.nan)}
     assert ev.success_criterion(report(0.20, np.nan), baselines).passed
+
+
+def test_success_is_not_decided_without_peak_hour_demand():
+    baselines = {"seasonal_naive": report(np.nan, 0.5), "historical_average": report(np.nan, 0.6)}
+    with pytest.raises(ValueError, match="Peak-hour WAPE is undefined"):
+        ev.success_criterion(report(np.nan, 0.5), baselines)

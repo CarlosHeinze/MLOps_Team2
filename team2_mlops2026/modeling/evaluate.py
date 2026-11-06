@@ -182,17 +182,20 @@ def rolling_origin_splits(
 ) -> list[Fold]:
     """The ``n_folds`` monthly folds from ``first_test_month`` (YYYY-MM).
 
-    Fails if the data has no hours before the first fold or ends before the last one.
+    Fails if the data has no hours before the first fold or none in any of the test months.
     """
     first = pd.Period(first_test_month, freq="M")
     folds = [Fold(first + k) for k in range(n_folds)]
     times = features[TIME]
-    if times.min() >= folds[0].test_start:
+    if not (times < folds[0].test_start).any():
         raise ValueError(f"No training hours before the first test month {first}")
-    if times.max() < folds[-1].test_start:
-        raise ValueError(
-            f"The data ends at {times.max()}, before the last test month {folds[-1].month}"
-        )
+    empty = [
+        str(f.month)
+        for f in folds
+        if not times.between(f.test_start, f.test_end, inclusive="left").any()
+    ]
+    if empty:
+        raise ValueError(f"No hours in the test months {', '.join(empty)}")
     return folds
 
 
@@ -217,7 +220,10 @@ def success_criterion(report: pd.DataFrame, baselines: Mapping[str, pd.DataFrame
     group has a higher WAPE than under that baseline. A group whose WAPE is undefined is not
     compared.
     """
-    name = min(baselines, key=lambda b: baselines[b].loc["peak", "wape"])
+    peak_wapes = {name: b.loc["peak", "wape"] for name, b in baselines.items()}
+    if not np.isfinite([report.loc["peak", "wape"], *peak_wapes.values()]).all():
+        raise ValueError("Peak-hour WAPE is undefined: the test rows have no peak-hour demand")
+    name = min(peak_wapes, key=peak_wapes.get)
     baseline = baselines[name]
     groups = [s for s in report.index if s.startswith("group_")]
     return SuccessCheck(
