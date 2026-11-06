@@ -121,6 +121,10 @@ the time windows (overnight and midday).
   that baseline for both conditions of the criterion.
 - **Backtest folds:** 12 monthly folds from 2025-10 to 2026-09. Each fold trains on every hour
   before its month and tests on that month.
+- **Station profiles:** the PCA scores (`1.05`) are fitted on the hours before 2025-10, the first
+  test month, so no fold sees its own demand through them. Later folds use profiles that are a
+  few months older than their training data, which keeps the scores fixed across folds.
+  Training rejects a test split that starts before the profiles' fit end.
 
 `team2_mlops2026/modeling/models.py` implements the two baselines. Each baseline is a
 scikit-learn estimator, and there is one model per target. Every station-hour must get a

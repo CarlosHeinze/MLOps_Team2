@@ -42,12 +42,17 @@ def lineage(tmp_path, mlflow_store):
 
 
 def test_training_data_joins_the_profiles_and_splits_in_time(lineage):
-    train, test = tr.load_training_data(lineage["dir"], TEST_START)
+    train, test = tr.load_training_data(lineage["dir"], TEST_START, TEST_START)
     assert train[ft.TIME].max() < pd.Timestamp(TEST_START) == test[ft.TIME].min()
     assert "pc1" in train.columns and train["pc1"].notna().all()
     new = test[test[ft.STATION] == 3]
     assert len(new) and new["pc1"].isna().all()  # opened after the profiles were fitted
     assert not set(ft.TARGETS) & set(tr.model_inputs(test).columns)
+
+
+def test_a_test_split_before_the_profiles_fit_end_is_rejected(lineage):
+    with pytest.raises(ValueError, match="before the profiles' fit end 2024-02-26"):
+        tr.load_training_data(lineage["dir"], "2024-02-19", TEST_START)
 
 
 def test_report_metrics_are_flat_and_defined():
@@ -63,11 +68,13 @@ def test_report_metrics_are_flat_and_defined():
 
 def test_unknown_models_and_targets_are_rejected(lineage):
     with pytest.raises(ValueError, match="Unknown models or targets: prophet, bikes"):
-        tr.train(["prophet"], ["bikes"], lineage["dir"], TEST_START)
+        tr.train(["prophet"], ["bikes"], lineage["dir"], TEST_START, TEST_START)
 
 
 def test_train_tracked_logs_each_baseline_and_target_with_its_lineage(lineage):
-    results = tr.train_tracked(src=lineage["dir"], test_start=TEST_START)
+    results = tr.train_tracked(
+        src=lineage["dir"], test_start=TEST_START, profiles_fit_end=TEST_START
+    )
     assert {(r.name, r.target) for r in results} == {
         (m, t) for m in tr.BASELINES for t in ft.TARGETS
     }
@@ -76,7 +83,7 @@ def test_train_tracked_logs_each_baseline_and_target_with_its_lineage(lineage):
         **input_digests(lineage["features"]["mlflow_run_id"]),
         **input_digests(lineage["profiles"]["mlflow_run_id"]),
     }
-    _, test = tr.load_training_data(lineage["dir"], TEST_START)
+    _, test = tr.load_training_data(lineage["dir"], TEST_START, TEST_START)
     for result in results:
         run = mlflow.get_run(result.run_id)
         assert run.info.run_name == f"train-{result.name}-{result.target}"

@@ -35,7 +35,7 @@ import typer
 from team2_mlops2026.features import FEATURES_DIR, FEATURES_FILE, STATION, TARGETS, time_split
 from team2_mlops2026.modeling.evaluate import TEST_START, segment_report
 from team2_mlops2026.modeling.models import BASELINES, FAMILY, TRUSTED_TYPES
-from team2_mlops2026.station_profiles import PROFILES_FILE
+from team2_mlops2026.station_profiles import DEFAULT_FIT_END, PROFILES_FILE
 
 RUN_PREFIX = "train"
 MODEL_ARTIFACT = "model"
@@ -54,13 +54,20 @@ class TrainedModel:
 
 
 def load_training_data(
-    src: str | Path = FEATURES_DIR, test_start: str = TEST_START
+    src: str | Path = FEATURES_DIR,
+    test_start: str = TEST_START,
+    profiles_fit_end: str = DEFAULT_FIT_END,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Station-hour features with each station's profile scores, split at ``test_start``.
 
-    The profiles are fitted on the hours before ``station_profiles.DEFAULT_FIT_END``, which is
-    the default ``test_start``, so the scores carry no test information.
+    ``profiles_fit_end`` is the ``fit_end`` the profiles were fitted with. A test split that
+    starts before it is rejected, since the scores would carry test-period demand.
     """
+    if pd.Timestamp(test_start) < pd.Timestamp(profiles_fit_end):
+        raise ValueError(
+            f"The test split starts at {test_start}, before the profiles' fit end "
+            f"{profiles_fit_end}: refit the profiles with --fit-end {test_start} or earlier"
+        )
     src = Path(src)
     scores = pd.read_parquet(src / PROFILES_FILE)
     scores = scores.astype({c: "float32" for c in scores.columns if c != STATION})
@@ -112,10 +119,11 @@ def train(
     targets: Sequence[str] = TARGETS,
     src: str | Path = FEATURES_DIR,
     test_start: str = TEST_START,
+    profiles_fit_end: str = DEFAULT_FIT_END,
 ) -> list[TrainedModel]:
     """Trains every model for every target on the same split."""
     _check_names(models, targets)
-    train_rows, test_rows = load_training_data(src, test_start)
+    train_rows, test_rows = load_training_data(src, test_start, profiles_fit_end)
     return [
         train_model(name, target, train_rows, test_rows)
         for name, target in product(models, targets)
@@ -127,6 +135,7 @@ def train_tracked(
     targets: Sequence[str] = TARGETS,
     src: str | Path = FEATURES_DIR,
     test_start: str = TEST_START,
+    profiles_fit_end: str = DEFAULT_FIT_END,
 ) -> list[TrainedModel]:
     """``train()`` with one MLflow run per model and target in the project's experiment.
 
@@ -142,7 +151,7 @@ def train_tracked(
 
     _check_names(models, targets)
     src = Path(src)
-    train_rows, test_rows = load_training_data(src, test_start)
+    train_rows, test_rows = load_training_data(src, test_start, profiles_fit_end)
     example = model_inputs(test_rows.head(INPUT_EXAMPLE_ROWS))
     results = []
     for name, target in product(models, targets):
@@ -195,10 +204,13 @@ def main(
     test_start: Annotated[
         str, typer.Option(help="YYYY-MM: first month of the test split")
     ] = TEST_START,
+    profiles_fit_end: Annotated[
+        str, typer.Option(help="YYYY-MM: the fit end the station profiles were fitted with")
+    ] = DEFAULT_FIT_END,
     track: Annotated[bool, typer.Option(help="Log the runs to the MLflow server")] = True,
 ):
     (train_tracked if track else train)(
-        model or tuple(BASELINES), target or TARGETS, src, test_start
+        model or tuple(BASELINES), target or TARGETS, src, test_start, profiles_fit_end
     )
 
 
