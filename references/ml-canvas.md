@@ -197,6 +197,27 @@ forecast, so both baselines fall back to a simpler rule where their own rule has
 - **Cost:** about 4.3M trips per year become about 4M station-hours. Building features and
   training takes minutes on a laptop.
 
+`team2_mlops2026/modeling/models.py` implements the candidates next to the baselines, in one
+catalog (`MODELS`) with each model's defaults and the search space for tuning. Notebook `2.02`
+compares them. The choices:
+
+- **Candidates:**
+  - a Poisson GLM, as the interpretable linear reference
+  - scikit-learn's histogram gradient boosting with a Poisson loss
+  - LightGBM with a Poisson and with a Tweedie objective
+  - the same gradient boosting with squared error, as a contrast that shows what the count loss
+    adds. Squared error can forecast negative demand, so its forecasts are clipped at 0.
+- **One pipeline per model:** each candidate is a scikit-learn `Pipeline` of the preprocessor of
+  `1.04` and the regressor, so the target encoding, imputation and scaling are fitted on the
+  training rows of every fit. The logged model therefore takes the raw station-hour features.
+- **Station profiles:** the first five PCA components (`1.05`) are joined as station features.
+  Each later component adds 3% of the variance or less, and only these five are stable from a
+  station's first four weeks. Stations without a profile get 0 (the average profile) and a flag.
+  These are the stations with fewer than 500 training trips and every station opened after the
+  profiles' fit end.
+- **No early stopping yet:** scikit-learn's automatic early stopping validates on a random 10%
+  of the rows, which ignores time order. The tuning step validates on later hours instead.
+
 ## 9. Features
 
 All features are computed per station-hour, using only information available at prediction

@@ -10,7 +10,8 @@ a few components (notebook 1.05): for example, stations people leave in the morn
 to in the evening (residential) against the opposite pattern (work and study areas).
 
 - PCA is fitted only on hours before ``fit_end``, where the test period of notebook 1.04 starts,
-  so no test information reaches the components.
+  so no test information reaches the components. The table records its ``fit_end`` in the file
+  metadata, so training can reject a test split that starts earlier.
 - Shares are centred but not scaled: they are already on one scale, and scaling would blow up
   the noise of the almost empty night hours (some of them have no trips at all).
 - Stations with fewer than ``min_trips`` trips in the window get no profile: a few trips do not
@@ -41,6 +42,7 @@ PROFILES_FILE = "station_profiles.parquet"
 RUN_NAME = "fit-station-profiles"
 
 DEFAULT_FIT_END = "2025-10"  # first month of the test period in notebook 1.04
+FIT_END_KEY = "fit_end"  # key of the fit end in the table's metadata (DataFrame.attrs)
 MIN_TRIPS = 500
 VARIANCE_TARGET = 0.9  # keep the components that explain 90% of the variance
 
@@ -144,8 +146,10 @@ def create_profiles(
     dest = Path(dst) / PROFILES_FILE
     dest.parent.mkdir(parents=True, exist_ok=True)
     tmp = dest.with_suffix(".parquet.part")
+    table = scores.reset_index()
+    table.attrs[FIT_END_KEY] = fit_end
     try:
-        scores.reset_index().to_parquet(tmp, index=False)
+        table.to_parquet(tmp, index=False)
         tmp.replace(dest)
     finally:
         tmp.unlink(missing_ok=True)

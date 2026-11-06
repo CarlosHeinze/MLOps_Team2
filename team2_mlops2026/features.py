@@ -13,8 +13,9 @@ how its columns are transformed before modelling:
 - Calendar features with a cyclical encoding, so 23:00 sits next to 00:00 and December next to
   January (notebook 1.03: hour and weekday drive demand non-linearly).
 - ``make_preprocessor``: log1p + standard scaling for the skewed counts, one-hot for the weekday,
-  target encoding for the ~480 station ids, imputation + scaling for the station attributes.
-  It is fitted on the training split only (``time_split``), so no test statistic leaks in.
+  target encoding for the ~480 station ids, imputation + scaling for the station attributes and
+  for the PCA profile scores when they are joined. It is fitted on the training split only
+  (``time_split``), so no test statistic leaks in.
 
 Usage (CLI):
     python -m team2_mlops2026.features
@@ -33,8 +34,8 @@ import warnings
 from loguru import logger
 import numpy as np
 import pandas as pd
-from sklearn.compose import ColumnTransformer
-from sklearn.impute import SimpleImputer
+from sklearn.compose import ColumnTransformer, make_column_selector
+from sklearn.impute import MissingIndicator, SimpleImputer
 from sklearn.model_selection import KFold
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import (
@@ -77,6 +78,7 @@ DEMAND_FEATURES = tuple(
 WEEKDAY = "weekday"  # Monday = 0
 CYCLICAL = ("hour_sin", "hour_cos", "month_sin", "month_cos")
 STATION_ATTRS = ("latitude", "longitude", "capacity")
+PROFILE_SCORES = r"^pc\d+$"  # the station_profiles scores pc1, pc2... joined for training
 FEATURE_COLUMNS = (STATION, TIME, *TARGETS, *DEMAND_FEATURES, WEEKDAY, *CYCLICAL, *STATION_ATTRS)
 
 app = typer.Typer()
@@ -230,6 +232,9 @@ def make_preprocessor(random_state: int = SEED) -> ColumnTransformer:
     - Hour and month: already sin/cos in [-1, 1], passed through.
     - Lagged demand: right-skewed counts -> median imputation for new stations, log1p, scaling.
     - Station attributes: median imputation for ids missing from the nomenclature, scaling.
+    - Profile scores (``pc1``...), if joined: a station without a profile gets 0, the average
+      profile (PCA centres the scores), then scaling, plus one indicator column that flags the
+      stations without a profile. A frame without the scores selects no columns.
     """
     counts = make_pipeline(
         SimpleImputer(strategy="median"),
@@ -237,6 +242,7 @@ def make_preprocessor(random_state: int = SEED) -> ColumnTransformer:
         StandardScaler(),
     )
     attributes = make_pipeline(SimpleImputer(strategy="median"), StandardScaler())
+    profiles = make_pipeline(SimpleImputer(strategy="constant", fill_value=0), StandardScaler())
     folds = KFold(n_splits=5, shuffle=True, random_state=random_state)
     return ColumnTransformer(
         [
@@ -245,6 +251,13 @@ def make_preprocessor(random_state: int = SEED) -> ColumnTransformer:
             ("cyclical", "passthrough", list(CYCLICAL)),
             ("demand", counts, list(DEMAND_FEATURES)),
             ("station_attrs", attributes, list(STATION_ATTRS)),
+            ("profiles", profiles, make_column_selector(pattern=PROFILE_SCORES)),
+            # A station has all its scores or none, so one indicator is enough
+            (
+                "no_profile",
+                MissingIndicator(features="all"),
+                make_column_selector(pattern="^pc1$"),
+            ),
         ]
     ).set_output(transform="pandas")
 

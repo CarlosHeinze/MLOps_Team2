@@ -96,7 +96,7 @@ def test_create_profiles_tracked_logs_input_output_and_variance(features, tmp_pa
     assert datasets["mibici_station_profiles"].digest == tracking.files_digest([output], src)
     scores = pd.read_parquet(output)
     assert list(scores.columns) == [STATION, *(f"pc{i}" for i in range(1, summary["components"] + 1))]
-    assert run.data.params["fit_end"] == "2024-02"
+    assert run.data.params["fit_end"] == scores.attrs[sp.FIT_END_KEY] == "2024-02"
     assert run.data.metrics["stations"] == 6
     assert run.data.metrics["explained_variance"] >= sp.VARIANCE_TARGET
     artifacts = [a.path for a in MlflowClient().list_artifacts(run.info.run_id)]

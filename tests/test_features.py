@@ -114,6 +114,22 @@ def test_preprocessor_encodes_scales_and_handles_unseen_stations(table):
     assert x_train["demand__departures_lag_7d"].mean() == pytest.approx(0, abs=1e-6)
     assert list(x_test.columns) == list(x_train.columns)
     assert not x_test.isna().any().any()  # unseen station and its missing lags are handled
+    assert not any(c.startswith("profiles__") for c in x_train)  # no scores joined
+
+
+def test_preprocessor_flags_the_stations_without_a_profile(table):
+    scores = pd.DataFrame({ft.STATION: [1, 2], "pc1": [0.5, -0.5], "pc2": [0.1, 0.2]})
+    rows = table.merge(scores, on=ft.STATION, how="left")  # station 3 has no profile
+    train, test = ft.time_split(rows, NEW_STATION_OPENS + pd.Timedelta(days=1))
+    x_test = ft.make_preprocessor().fit(train, train["departures"]).transform(test)
+    assert [c for c in x_test if "pc" in c] == [
+        "profiles__pc1",
+        "profiles__pc2",
+        "no_profile__missingindicator_pc1",
+    ]
+    assert not x_test.isna().any().any()
+    flag = x_test["no_profile__missingindicator_pc1"].to_numpy()
+    assert (flag == test[ft.STATION].eq(3).to_numpy()).all()
 
 
 # --- tracked build -------------------------------------------------------------

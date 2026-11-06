@@ -125,6 +125,35 @@ def plot_bars(
     return fig
 
 
+def plot_grouped_bars(
+    df: pd.DataFrame,
+    title: str,
+    ylabel: str,
+    references: dict | None = None,
+    fmt: str = "{:.3f}",
+) -> plt.Figure:
+    """One group of bars per row and one bar per column (at most three columns), with an
+    optional dashed reference line per column, such as a target to beat."""
+    fig, ax = plt.subplots(figsize=(max(6, 0.9 * len(df) * len(df.columns)), 4))
+    width = 0.8 / len(df.columns)
+    x = np.arange(len(df))
+    for i, (col, color) in enumerate(zip(df.columns, _colors(df.columns))):
+        bars = ax.bar(x + (i - (len(df.columns) - 1) / 2) * width, df[col], width, color=color)
+        bars.set_label(str(col))
+        ax.bar_label(
+            bars, labels=[fmt.format(v) for v in df[col]], color=INK_SECONDARY, fontsize=8
+        )
+        if references and col in references:
+            ax.axhline(references[col], color=color, linestyle="--", linewidth=1)
+    ax.set_xticks(x, df.index.astype(str))
+    ax.set(title=title, ylabel=ylabel)
+    ax.grid(axis="x", visible=False)
+    if len(df.columns) > 1:
+        ax.legend()
+    fig.tight_layout()
+    return fig
+
+
 def plot_lines(
     df: pd.DataFrame, title: str, ylabel: str, xlabel: str = "", figsize=(12, 4)
 ) -> plt.Figure:
