@@ -104,6 +104,24 @@ the time windows (overnight and midday).
   hours, with no station group (for example, low-demand peripheral stations) worse than the
   baseline.
 
+`team2_mlops2026/modeling/evaluate.py` implements this protocol. It makes these choices:
+
+- **Peak hours:** Monday to Friday at 7-9 h and 17-19 h, around the 8:00 and 18:00 commuter
+  peaks (`1.03`).
+- **Station groups:** stations are ranked by their mean hourly demand **in the training split**,
+  so a test month never decides its own segments. The top 50 form one segment, and five
+  demand quintiles form the groups for the fairness check. Ranking by the hourly mean rather
+  than by total trips keeps a busy station that opened recently among the busy ones.
+- **Unseen stations:** stations without training history are reported as their own segment.
+  About 100 stations opened between May and August 2026, so this segment also signals drift.
+- **Undefined values:** WAPE is undefined (NaN) for a segment with no demand, and that segment
+  is skipped in the group comparison. Station-days without a known capacity are left out of the
+  decision metric.
+- **Best baseline:** the baseline with the lowest peak-hour WAPE. The model is compared with
+  that baseline for both conditions of the criterion.
+- **Backtest folds:** 12 monthly folds from 2025-10 to 2026-09. Each fold trains on every hour
+  before its month and tests on that month.
+
 ## 5. Making predictions
 
 - **When:** a batch job every night at about 23:00 for the next day, with an optional refresh
