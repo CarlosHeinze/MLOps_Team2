@@ -67,6 +67,14 @@ def test_lags_look_back_two_days_one_week_and_four_weeks(table):
     assert at(table, 1, eight + pd.Timedelta(hours=1))["departures_lag_2d"] == 0
 
 
+def test_mean_7d_is_the_level_of_the_known_hours_up_to_two_days_back(table):
+    assert at(table, 1, START)["departures_mean_7d"] == pytest.approx(7 / 168)  # 1 trip a day
+    station_3 = table[table[ft.STATION] == 3].set_index(ft.TIME)["departures_mean_7d"]
+    assert station_3[: NEW_STATION_OPENS + pd.Timedelta(hours=47)].isna().all()
+    # Three days after opening, the 25 hours known 48 h back hold 2 trips
+    assert station_3[NEW_STATION_OPENS + pd.Timedelta(hours=72)] == pytest.approx(2 / 25)
+
+
 def test_hours_before_a_station_opened_are_dropped_and_unknown_in_lags(table):
     station_3 = table[table[ft.STATION] == 3]
     assert station_3[ft.TIME].min() == NEW_STATION_OPENS  # no fake zero demand before opening
@@ -114,6 +122,22 @@ def test_preprocessor_encodes_scales_and_handles_unseen_stations(table):
     assert x_train["demand__departures_lag_7d"].mean() == pytest.approx(0, abs=1e-6)
     assert list(x_test.columns) == list(x_train.columns)
     assert not x_test.isna().any().any()  # unseen station and its missing lags are handled
+    assert not any(c.startswith("profiles__") for c in x_train)  # no scores joined
+
+
+def test_preprocessor_flags_the_stations_without_a_profile(table):
+    scores = pd.DataFrame({ft.STATION: [1, 2], "pc1": [0.5, -0.5], "pc2": [0.1, 0.2]})
+    rows = table.merge(scores, on=ft.STATION, how="left")  # station 3 has no profile
+    train, test = ft.time_split(rows, NEW_STATION_OPENS + pd.Timedelta(days=1))
+    x_test = ft.make_preprocessor().fit(train, train["departures"]).transform(test)
+    assert [c for c in x_test if "pc" in c] == [
+        "profiles__pc1",
+        "profiles__pc2",
+        "no_profile__missingindicator_pc1",
+    ]
+    assert not x_test.isna().any().any()
+    flag = x_test["no_profile__missingindicator_pc1"].to_numpy()
+    assert (flag == test[ft.STATION].eq(3).to_numpy()).all()
 
 
 # --- tracked build -------------------------------------------------------------

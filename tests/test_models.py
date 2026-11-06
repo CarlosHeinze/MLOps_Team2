@@ -3,11 +3,24 @@ import pandas as pd
 import pytest
 from sklearn.base import clone
 from sklearn.exceptions import NotFittedError
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import ParameterSampler
+import skops.io
+from trip_factory import STATIONS, make_trips
 
-from team2_mlops2026.features import STATION, TIME, WEEKDAY
-from team2_mlops2026.modeling.models import BASELINES, HistoricalAverage, SeasonalNaive
+from team2_mlops2026.features import SEED, STATION, TARGETS, TIME, WEEKDAY, build_features
+from team2_mlops2026.modeling.models import (
+    BASELINES,
+    CANDIDATES,
+    MODELS,
+    TRUSTED_TYPES,
+    HistoricalAverage,
+    NonNegative,
+    SeasonalNaive,
+)
 
 MONDAY = pd.Timestamp("2025-09-01")
+DAY0 = pd.Timestamp("2024-01-01")  # a Monday
 
 
 def rows(station, times, **columns) -> pd.DataFrame:
@@ -56,5 +69,56 @@ def test_baselines_behave_as_scikit_learn_estimators(model, train):
 
 
 def test_catalog_builds_an_unfitted_model_per_target():
-    assert BASELINES["seasonal_naive"]("arrivals").target == "arrivals"
-    assert isinstance(BASELINES["historical_average"]("arrivals"), HistoricalAverage)
+    assert BASELINES["seasonal_naive"].build("arrivals").target == "arrivals"
+    assert isinstance(BASELINES["historical_average"].build("arrivals"), HistoricalAverage)
+    assert MODELS == BASELINES | CANDIDATES and len(CANDIDATES) >= 3
+    assert {spec.family for spec in MODELS.values()} == {"baseline", "glm", "boosting"}
+
+
+def test_non_negative_clips_the_forecasts_at_zero():
+    X, y = pd.DataFrame({"x": [0.0, 1.0, 2.0]}), np.array([-2.0, 0.0, 2.0])
+    model = NonNegative(LinearRegression())
+    with pytest.raises(NotFittedError):
+        model.predict(X)
+    assert model.fit(X, y).predict(X).tolist() == pytest.approx([0, 0, 2])
+    assert clone(model).get_params()["regressor"] is not model.regressor
+
+
+@pytest.fixture(scope="module")
+def station_hours():
+    """Six weeks of random commutes between stations 1 and 2, plus station 3 (not in the
+    nomenclature and without a profile score) from week 5 on."""
+    rng = np.random.default_rng(SEED)
+    hours = DAY0 + pd.to_timedelta(rng.integers(0, 6 * 168, 3000), unit="h")
+    origins = rng.choice([1, 2, 3], len(hours), p=[0.5, 0.4, 0.1])
+    trips = make_trips(
+        *(
+            {"start": start, "Origen_Id": int(a), "Destino_Id": 1 if a != 1 else 2}
+            for start, a in zip(hours, origins)
+            if a != 3 or start >= DAY0 + pd.Timedelta(weeks=4)
+        )
+    )
+    table = build_features(trips, STATIONS, DAY0 + pd.Timedelta(weeks=4))
+    scores = pd.DataFrame({STATION: [1, 2], "pc1": [0.4, -0.4], "pc2": [0.1, -0.2]})
+    return table.merge(scores, on=STATION, how="left")
+
+
+@pytest.mark.parametrize("name", CANDIDATES)
+@pytest.mark.parametrize("target", TARGETS)
+def test_every_candidate_fits_and_forecasts_counts(name, target, station_hours):
+    X = station_hours.drop(columns=list(TARGETS))
+    model = CANDIDATES[name].build(target).fit(X, station_hours[target])
+    y_pred = model.predict(X)
+    assert y_pred.shape == (len(X),) and np.isfinite(y_pred).all() and (y_pred >= 0).all()
+    # A logged model loads with the trusted types only
+    assert set(skops.io.get_untrusted_types(data=skops.io.dumps(model))) <= set(TRUSTED_TYPES)
+
+
+@pytest.mark.parametrize("name", CANDIDATES)
+def test_search_space_samples_are_valid_overrides(name):
+    spec = CANDIDATES[name]
+    (sample,) = ParameterSampler(spec.search_space, n_iter=1, random_state=SEED)
+    model = spec.build("departures", **sample)
+    params = model[-1].get_params()
+    assert all(params.get(k, params.get(f"regressor__{k}")) == v for k, v in sample.items())
+    assert spec.build("departures")[-1].get_params() != params  # defaults left untouched

@@ -112,19 +112,26 @@ the time windows (overnight and midday).
   so a test month never decides its own segments. The top 50 form one segment, and five
   demand quintiles form the groups for the fairness check. Ranking by the hourly mean rather
   than by total trips keeps a busy station that opened recently among the busy ones.
+- **Groups compared on daily WAPE:** the fairness check compares each group's WAPE of the
+  station-day totals, not of the single hours. In the quietest group a station has 0.2 trips
+  per hour, so most hours have none. There the hourly WAPE is lowest for a forecast of zero
+  (1.00, against 1.30 for the seasonal naive on arrivals, `2.02`): it rewards forecasting no
+  demand instead of the expected demand. The station-day is also the unit of the rebalancing
+  decision. The hourly WAPE per group stays in the report.
 - **Unseen stations:** stations without training history are reported as their own segment.
   About 100 stations opened between May and August 2026, so this segment also signals drift.
-- **Undefined values:** WAPE is undefined (NaN) for a segment with no demand, and that segment
-  is skipped in the group comparison. Station-days without a known capacity are left out of the
+- **Undefined values:** WAPE and daily WAPE are undefined (NaN) for a segment with no demand,
+  and that segment is skipped in the group comparison. Station-days without a known capacity are left out of the
   decision metric.
 - **Best baseline:** the baseline with the lowest peak-hour WAPE. The model is compared with
   that baseline for both conditions of the criterion.
 - **Backtest folds:** 12 monthly folds from 2025-10 to 2026-09. Each fold trains on every hour
   before its month and tests on that month.
-- **Station profiles:** the PCA scores (`1.05`) are fitted on the hours before 2025-10, the first
-  test month, so no fold sees its own demand through them. Later folds use profiles that are a
-  few months older than their training data, which keeps the scores fixed across folds.
-  Training rejects a test split that starts before the profiles' fit end.
+- **Station profiles:** the PCA components (`1.05`) are fitted on the hours before 2025-10, the
+  first test month, so no fold sees its own demand through them. Later folds use components
+  that are a few months older than their training data, which keeps them fixed across folds.
+  The weekly scores only use trips known before each week (see §8). Training rejects a test
+  split that starts before the profiles' fit end.
 
 `team2_mlops2026/modeling/models.py` implements the two baselines. Each baseline is a
 scikit-learn estimator, and there is one model per target. Every station-hour must get a
@@ -197,6 +204,37 @@ forecast, so both baselines fall back to a simpler rule where their own rule has
 - **Cost:** about 4.3M trips per year become about 4M station-hours. Building features and
   training takes minutes on a laptop.
 
+`team2_mlops2026/modeling/models.py` implements the candidates next to the baselines, in one
+catalog (`MODELS`) with each model's defaults and the search space for tuning. Notebook `2.02`
+compares them. The choices:
+
+- **Candidates:**
+  - a Poisson GLM, as the interpretable linear reference
+  - scikit-learn's histogram gradient boosting with a Poisson loss
+  - LightGBM with a Poisson and with a Tweedie objective
+  - the same gradient boosting with squared error, as a contrast that shows what the count loss
+    adds. Squared error can forecast negative demand, so its forecasts are clipped at 0.
+- **One pipeline per model:** each candidate is a scikit-learn `Pipeline` of the preprocessor of
+  `1.04` and the regressor, so the target encoding, imputation and scaling are fitted on the
+  training rows of every fit. The logged model therefore takes the raw station-hour features.
+- **Station profiles, week by week:** the first five PCA components (`1.05`) are joined as
+  station features. Each later component adds 3% of the variance or less, and only these five
+  are stable from a station's first four weeks.
+  - The scores are recomputed every week, from the station's last four weeks of trips that end
+    48 h before the week starts. Station-weeks with fewer than 100 trips get 0 (the average
+    profile) and a flag.
+  - A first version gave each station one score from the whole fit period. Then the only
+    stations without a score in training were the quiet ones, so the flag learned "no demand",
+    and the models forecast almost nothing at the stations opened in 2026 (`2.02`). With
+    weekly scores the first weeks of every station opened in 2023-2025 also carry the flag, and
+    a station opened in 2026 gets its own scores from its fifth week.
+- **Recent level:** `<target>_mean_7d`, the mean hourly demand of the 7 days that end 48 h back
+  (the rolling mean of §9). At a quiet station single lagged hours are mostly 0 or 1. The level
+  shows whether the station has been in use at all, and for a new station it is the first
+  estimate of how busy it is.
+- **No early stopping yet:** scikit-learn's automatic early stopping validates on a random 10%
+  of the rows, which ignores time order. The tuning step validates on later hours instead.
+
 ## 9. Features
 
 All features are computed per station-hour, using only information available at prediction
@@ -211,8 +249,8 @@ time.
   - sin/cos cyclical encoding of the hour and weekday
   - month, and holiday and school-calendar flags
 - **History:**
-  - demand in the same hour 1 day and 7 days before
-  - rolling means over the last 7 and 28 days
+  - demand in the same hour 2 days and 7 days before
+  - the mean of the same hour over the last 4 weeks, and the mean demand of the last 7 days
   - the station's average net flow
 - **Context (candidates):** rain and temperature.
 - **Not used:** rider-level gender and birth year. `1.03` shows they predict trip

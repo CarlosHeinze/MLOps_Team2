@@ -37,22 +37,36 @@ def lineage(tmp_path, mlflow_store):
     STATIONS.to_parquet(interim / "estaciones" / "nomenclatura_2024_01.parquet", index=False)
 
     features = ft.create_features_tracked(processed, interim, dst, start=str(START.date()))
-    profiles = sp.create_profiles_tracked(dst, dst, fit_end=TEST_START, min_trips=1)
+    profiles = sp.create_profiles_tracked(
+        dst, dst, fit_end=TEST_START, min_trips=1, score_min_trips=1
+    )
     return {"dir": dst, "features": features, "profiles": profiles}
 
 
 def test_training_data_joins_the_profiles_and_splits_in_time(lineage):
-    train, test = tr.load_training_data(lineage["dir"], TEST_START, TEST_START)
+    train, test = tr.load_training_data(lineage["dir"], TEST_START)
     assert train[ft.TIME].max() < pd.Timestamp(TEST_START) == test[ft.TIME].min()
-    assert "pc1" in train.columns and train["pc1"].notna().all()
+    first_week = train[ft.TIME] < START + pd.Timedelta(weeks=1)
+    assert train.loc[first_week, "pc1"].isna().all()  # no history before the table starts
+    assert train.loc[~first_week, "pc1"].notna().all()
     new = test[test[ft.STATION] == 3]
-    assert len(new) and new["pc1"].isna().all()  # opened after the profiles were fitted
+    assert len(new) and new["pc1"].isna().all()  # opened in the week it is forecast
     assert not set(ft.TARGETS) & set(tr.model_inputs(test).columns)
 
 
 def test_a_test_split_before_the_profiles_fit_end_is_rejected(lineage):
+    # The fit end comes from the profiles table, not from the caller
     with pytest.raises(ValueError, match="before the profiles' fit end 2024-02-26"):
-        tr.load_training_data(lineage["dir"], "2024-02-19", TEST_START)
+        tr.load_training_data(lineage["dir"], "2024-02-19")
+
+
+def test_profiles_without_a_recorded_fit_end_are_rejected(lineage):
+    profiles = lineage["dir"] / sp.PROFILES_FILE
+    scores = pd.read_parquet(profiles)
+    scores.attrs.clear()
+    scores.to_parquet(profiles, index=False)
+    with pytest.raises(ValueError, match="does not record its fit end"):
+        tr.load_training_data(lineage["dir"], TEST_START)
 
 
 def test_report_metrics_are_flat_and_defined():
@@ -68,30 +82,32 @@ def test_report_metrics_are_flat_and_defined():
 
 def test_unknown_models_and_targets_are_rejected(lineage):
     with pytest.raises(ValueError, match="Unknown models or targets: prophet, bikes"):
-        tr.train(["prophet"], ["bikes"], lineage["dir"], TEST_START, TEST_START)
+        tr.train(["prophet"], ["bikes"], lineage["dir"], TEST_START)
 
 
-def test_train_tracked_logs_each_baseline_and_target_with_its_lineage(lineage):
-    results = tr.train_tracked(
-        src=lineage["dir"], test_start=TEST_START, profiles_fit_end=TEST_START
-    )
-    assert {(r.name, r.target) for r in results} == {
-        (m, t) for m in tr.BASELINES for t in ft.TARGETS
-    }
+# A baseline, the clipped squared-error contrast and LightGBM; test_models covers every candidate
+TRACKED = ("seasonal_naive", "hgb_squared_error", "lgbm_tweedie")
+
+
+def test_train_tracked_logs_each_model_and_target_with_its_lineage(lineage):
+    results = tr.train_tracked(TRACKED, src=lineage["dir"], test_start=TEST_START)
+    assert {(r.name, r.target) for r in results} == {(m, t) for m in TRACKED for t in ft.TARGETS}
 
     upstream = {
         **input_digests(lineage["features"]["mlflow_run_id"]),
         **input_digests(lineage["profiles"]["mlflow_run_id"]),
     }
-    _, test = tr.load_training_data(lineage["dir"], TEST_START, TEST_START)
+    _, test = tr.load_training_data(lineage["dir"], TEST_START)
     for result in results:
         run = mlflow.get_run(result.run_id)
         assert run.info.run_name == f"train-{result.name}-{result.target}"
         assert run.info.status == "FINISHED"
-        assert run.data.tags["model_family"] == "baseline"
+        assert run.data.tags["model_family"] == tr.MODELS[result.name].family
         assert run.data.tags["target"] == result.target
         assert len(run.data.tags["git_commit"]) == 40
-        assert run.data.params["test_start"] == TEST_START
+        assert run.data.params["test_start"] == run.data.params["profiles_fit_end"] == TEST_START
+        assert run.data.metrics["fit_seconds"] == pytest.approx(result.fit_seconds)
+        assert run.data.metrics["model_size_mb"] > 0
         for metric in ("overall_wape", "overall_mae", "peak_wape", "peak_mae"):
             assert run.data.metrics[metric] == pytest.approx(
                 result.report.loc[metric.split("_")[0], metric.split("_")[1]]
