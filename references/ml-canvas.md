@@ -121,6 +121,23 @@ the time windows (overnight and midday).
   that baseline for both conditions of the criterion.
 - **Backtest folds:** 12 monthly folds from 2025-10 to 2026-09. Each fold trains on every hour
   before its month and tests on that month.
+- **Station profiles:** the PCA scores (`1.05`) are fitted on the hours before 2025-10, the first
+  test month, so no fold sees its own demand through them. Later folds use profiles that are a
+  few months older than their training data, which keeps the scores fixed across folds.
+  Training rejects a test split that starts before the profiles' fit end.
+
+`team2_mlops2026/modeling/models.py` implements the two baselines. Each baseline is a
+scikit-learn estimator, and there is one model per target. Every station-hour must get a
+forecast, so both baselines fall back to a simpler rule where their own rule has no value:
+
+- **Seasonal naive:** the same station and hour one week earlier (`<target>_lag_7d`). In a
+  station's first week that hour does not exist, and the forecast is the historical average
+  below instead (about 17k of the 3.6M test hours, all at stations that opened in 2026). The
+  4-week same-hour mean cannot serve as a fallback, because it is unknown in exactly the same
+  hours.
+- **Historical average:** the mean demand per station × weekday × hour over the training split.
+  A station with no training hours at that weekday and hour gets the mean of all stations at
+  that weekday and hour.
 
 ## 5. Making predictions
 
