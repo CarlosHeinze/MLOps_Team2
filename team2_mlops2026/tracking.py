@@ -13,6 +13,7 @@ from collections.abc import Iterable
 import hashlib
 import os
 from pathlib import Path
+import subprocess
 import warnings
 
 import mlflow
@@ -66,6 +67,23 @@ def start_run(run_name: str | None = None):
     check_tracking_server(MLFLOW_TRACKING_URI)
     mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
     return mlflow.start_run(run_name=run_name)
+
+
+def git_commit() -> str:
+    """The project's checked-out commit, or "unknown" outside a git checkout."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=PROJ_ROOT, capture_output=True, text=True, check=True
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return "unknown"
+    return result.stdout.strip()
+
+
+def input_digests(run_id: str) -> dict[str, str]:
+    """{name: digest} of the datasets a run logged."""
+    inputs = mlflow.get_run(run_id).inputs.dataset_inputs
+    return {i.dataset.name: i.dataset.digest for i in inputs}
 
 
 def dataset_source(path) -> str:

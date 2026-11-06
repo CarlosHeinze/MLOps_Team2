@@ -1,17 +1,16 @@
 """The tracked steps form one lineage: each step's output digest is the next step's input."""
 
-import mlflow
 from test_raw_data_extraction import FakeResponse, FakeSession
 from test_raw_data_normalization import raw_dir  # noqa: F401  (fixture: every raw variant)
 
 from team2_mlops2026.data import interim_data_cleaning as idc
 from team2_mlops2026.data import raw_data_extraction as rde
 from team2_mlops2026.data import raw_data_normalization as rdn
+from team2_mlops2026.tracking import input_digests
 
 
 def digests(summary: dict) -> dict[str, str]:
-    inputs = mlflow.get_run(summary["mlflow_run_id"]).inputs.dataset_inputs
-    return {i.dataset.name: i.dataset.digest for i in inputs}
+    return input_digests(summary["mlflow_run_id"])
 
 
 def test_tracked_steps_chain_from_raw_to_processed(raw_dir, tmp_path, mlflow_store, monkeypatch):  # noqa: F811
