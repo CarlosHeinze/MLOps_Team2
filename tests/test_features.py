@@ -67,6 +67,14 @@ def test_lags_look_back_two_days_one_week_and_four_weeks(table):
     assert at(table, 1, eight + pd.Timedelta(hours=1))["departures_lag_2d"] == 0
 
 
+def test_mean_7d_is_the_level_of_the_known_hours_up_to_two_days_back(table):
+    assert at(table, 1, START)["departures_mean_7d"] == pytest.approx(7 / 168)  # 1 trip a day
+    station_3 = table[table[ft.STATION] == 3].set_index(ft.TIME)["departures_mean_7d"]
+    assert station_3[: NEW_STATION_OPENS + pd.Timedelta(hours=47)].isna().all()
+    # Three days after opening, the 25 hours known 48 h back hold 2 trips
+    assert station_3[NEW_STATION_OPENS + pd.Timedelta(hours=72)] == pytest.approx(2 / 25)
+
+
 def test_hours_before_a_station_opened_are_dropped_and_unknown_in_lags(table):
     station_3 = table[table[ft.STATION] == 3]
     assert station_3[ft.TIME].min() == NEW_STATION_OPENS  # no fake zero demand before opening

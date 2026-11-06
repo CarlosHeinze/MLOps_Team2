@@ -21,9 +21,16 @@ def station_hours(stations, start, hours, **columns) -> pd.DataFrame:
     return frame.assign(**{"departures": 0, "arrivals": 0, "capacity": 10.0, **columns})
 
 
-def report(peak_wape, *group_wapes) -> pd.DataFrame:
-    rows = {"peak": peak_wape, **{f"group_{g}": w for g, w in enumerate(group_wapes, 1)}}
-    return pd.DataFrame({"wape": rows})
+def report(peak_wape, *group_wapes, hourly_group_wapes=None) -> pd.DataFrame:
+    """Peak WAPE plus the groups' daily WAPE (also their hourly WAPE, unless given)."""
+    groups = [f"group_{g}" for g in range(1, len(group_wapes) + 1)]
+    hourly = group_wapes if hourly_group_wapes is None else hourly_group_wapes
+    return pd.DataFrame(
+        {
+            "wape": {"peak": peak_wape, **dict(zip(groups, hourly))},
+            ev.DAILY_WAPE: {"peak": peak_wape, **dict(zip(groups, group_wapes))},
+        }
+    )
 
 
 # --- metrics -------------------------------------------------------------------
@@ -51,6 +58,14 @@ def test_empty_segment_has_undefined_metrics():
     m = ev.count_metrics([], [])
     assert m["n"] == 0
     assert all(np.isnan(m[k]) for k in ev.METRICS)
+
+
+def test_daily_wape_nets_the_hourly_errors_within_each_station_day():
+    # Day 0: 1 trip forecast an hour late; day 1: 2 trips, none forecast
+    y_true, y_pred, station_day = [1, 0, 2, 0], [0, 1, 0, 0], [0, 0, 1, 1]
+    assert ev.daily_wape(y_true, y_pred, station_day) == pytest.approx(2 / 3)
+    assert ev.count_metrics(y_true, y_pred)["wape"] == pytest.approx(4 / 3)
+    assert np.isnan(ev.daily_wape([0, 0], [1, 1], [0, 1]))
 
 
 @pytest.mark.parametrize("y_pred", [[1, np.nan], [1, -0.5], [1]])
@@ -85,7 +100,7 @@ def test_segment_report_scores_each_segment_on_its_own_rows():
 
     result = ev.segment_report(test, y_pred, "departures", train)
 
-    assert list(result.columns) == ["n", *ev.METRICS]
+    assert list(result.columns) == ["n", *ev.METRICS, ev.DAILY_WAPE]
     assert result.loc["overall", "n"] == 72
     assert result.loc["peak", "n"] == 3 * len(ev.PEAK_HOURS)  # a Tuesday
     assert result.loc["top_50", "n"] == 48  # every station seen in training
@@ -93,6 +108,7 @@ def test_segment_report_scores_each_segment_on_its_own_rows():
     assert result.loc["unseen_stations", "n"] == 24
     assert result.loc["unseen_stations", "wape"] == 1
     assert result.loc["overall", "wape"] == pytest.approx(1 / 3)
+    assert result.loc["unseen_stations", ev.DAILY_WAPE] == 1
 
 
 # --- decision metric -----------------------------------------------------------
@@ -190,6 +206,12 @@ def test_success_fails_if_any_demand_group_is_worse_than_the_baseline():
     check = ev.success_criterion(report(0.20, 0.5, 0.45), baselines)
     assert check.worse_groups == ("group_2",)
     assert not check.passed
+
+
+def test_demand_groups_are_compared_on_their_daily_wape():
+    baselines = {"historical_average": report(0.30, 0.6, hourly_group_wapes=[1.2])}
+    check = ev.success_criterion(report(0.20, 0.5, hourly_group_wapes=[1.3]), baselines)
+    assert check.passed  # worse hour by hour, better per station-day
 
 
 def test_groups_with_undefined_wape_are_not_compared():

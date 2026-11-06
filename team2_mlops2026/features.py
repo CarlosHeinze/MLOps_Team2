@@ -9,7 +9,10 @@ how its columns are transformed before modelling:
 - One row per station and hour while the station is active, zero hours included: most
   station-hours have no trips, and a model must learn those zeros too.
 - Lagged demand only from hours already known when the next-day forecast is made (>= 48 h back).
-  Hours before a station opened are unknown (NaN), not zero demand.
+  Hours before a station opened are unknown (NaN), not zero demand. Besides the same hour a day,
+  a week and four weeks back, the mean of the last 7 known days gives the station's recent
+  level: at a quiet station single hours are mostly 0 or 1, while the level shows whether it
+  has been in use at all (notebook 2.02).
 - Calendar features with a cyclical encoding, so 23:00 sits next to 00:00 and December next to
   January (notebook 1.03: hour and weekday drive demand non-linearly).
 - ``make_preprocessor``: log1p + standard scaling for the skewed counts, one-hot for the weekday,
@@ -68,12 +71,14 @@ STATION, TIME = "station_id", "hour_start"
 TARGETS = ("departures", "arrivals")
 # Hours back. The forecast for day D+1 is made on the night of day D, so the latest hour it can
 # use is >= 24 h before any target hour; 48 h keeps a margin for late data.
-LAGS = {"lag_2d": 48, "lag_7d": 168}
+FORECAST_GAP = 48
+LAGS = {"lag_2d": FORECAST_GAP, "lag_7d": 168}
 SAME_HOUR_WEEKS = 4  # mean of the same hour of the week over the previous 4 weeks
+MEAN_HOURS = 168  # mean_7d: mean hourly demand over the 7 days that end FORECAST_GAP back
 WARMUP_HOURS = SAME_HOUR_WEEKS * 168  # history needed before ``start`` for every lag
 
 DEMAND_FEATURES = tuple(
-    f"{target}_{name}" for target in TARGETS for name in [*LAGS, "same_hour_4w"]
+    f"{target}_{name}" for target in TARGETS for name in [*LAGS, "same_hour_4w", "mean_7d"]
 )
 WEEKDAY = "weekday"  # Monday = 0
 CYCLICAL = ("hour_sin", "hour_cos", "month_sin", "month_cos")
@@ -123,6 +128,17 @@ def _shift(values: np.ndarray, hours: int) -> np.ndarray:
     return out
 
 
+def _rolling_mean(values: np.ndarray, hours: int) -> np.ndarray:
+    """Mean of the known (non-NaN) values in the ``hours`` hours up to each hour."""
+    known = ~np.isnan(values)
+    sums = np.cumsum(np.where(known, values, 0), axis=1, dtype=np.float64)
+    counts = np.cumsum(known, axis=1, dtype=np.int64)
+    sums[:, hours:] -= sums[:, :-hours].copy()
+    counts[:, hours:] -= counts[:, :-hours].copy()
+    with np.errstate(invalid="ignore"):
+        return np.where(counts > 0, sums / counts, np.nan).astype(np.float32)
+
+
 def lag_features(counts: np.ndarray, active: np.ndarray) -> dict[str, np.ndarray]:
     """Lagged demand per station-hour; NaN where the lagged hour predates the station."""
     known = np.where(active, counts, np.nan).astype(np.float32)
@@ -131,6 +147,7 @@ def lag_features(counts: np.ndarray, active: np.ndarray) -> dict[str, np.ndarray
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", RuntimeWarning)  # all four weeks unknown -> NaN
         lags["same_hour_4w"] = np.nanmean(same_hour, axis=0)
+    lags["mean_7d"] = _rolling_mean(lags["lag_2d"], MEAN_HOURS)
     return lags
 
 
@@ -232,9 +249,10 @@ def make_preprocessor(random_state: int = SEED) -> ColumnTransformer:
     - Hour and month: already sin/cos in [-1, 1], passed through.
     - Lagged demand: right-skewed counts -> median imputation for new stations, log1p, scaling.
     - Station attributes: median imputation for ids missing from the nomenclature, scaling.
-    - Profile scores (``pc1``...), if joined: a station without a profile gets 0, the average
-      profile (PCA centres the scores), then scaling, plus one indicator column that flags the
-      stations without a profile. A frame without the scores selects no columns.
+    - Profile scores (``pc1``...), if joined: a station-week without scores (too few recent
+      trips, or a new station) gets 0, the average profile (PCA centres the scores), then
+      scaling, plus one indicator column that flags it. A frame without the scores selects no
+      columns.
     """
     counts = make_pipeline(
         SimpleImputer(strategy="median"),
@@ -252,7 +270,7 @@ def make_preprocessor(random_state: int = SEED) -> ColumnTransformer:
             ("demand", counts, list(DEMAND_FEATURES)),
             ("station_attrs", attributes, list(STATION_ATTRS)),
             ("profiles", profiles, make_column_selector(pattern=PROFILE_SCORES)),
-            # A station has all its scores or none, so one indicator is enough
+            # A station-week has all its scores or none, so one indicator is enough
             (
                 "no_profile",
                 MissingIndicator(features="all"),

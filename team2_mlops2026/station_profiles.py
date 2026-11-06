@@ -14,16 +14,21 @@ to in the evening (residential) against the opposite pattern (work and study are
   metadata, so training can reject a test split that starts earlier.
 - Shares are centred but not scaled: they are already on one scale, and scaling would blow up
   the noise of the almost empty night hours (some of them have no trips at all).
-- Stations with fewer than ``min_trips`` trips in the window get no profile: a few trips do not
-  describe a pattern. Stations that open later are transformed with the fitted PCA once they have
-  their own history (notebook 1.05 shows that four weeks are enough).
+- Stations with fewer than ``min_trips`` trips in the window do not enter the fit: a few trips do
+  not describe a pattern.
+- The scores are time-aware: every week, each station's profile of its last four weeks, ending
+  48 h before the week starts (the history known at its first forecast), is projected on the
+  fitted components. Notebook 1.05 shows that four weeks place a station. So a station opened
+  after ``fit_end`` gets scores from its fifth week on, and in training the stations opened
+  then have no scores in their first weeks, just as new stations in the test period (notebook
+  2.02: with one fixed score per station, "no profile" only meant a quiet station).
 
 Usage (CLI):
     python -m team2_mlops2026.station_profiles
     python -m team2_mlops2026.station_profiles --fit-end 2025-10 --variance 0.9 --no-track
 
 Usage (notebook):
-    from team2_mlops2026.station_profiles import fit_pca, hour_of_week_profiles
+    from team2_mlops2026.station_profiles import fit_pca, hour_of_week_profiles, weekly_profiles
 """
 
 from __future__ import annotations
@@ -32,11 +37,19 @@ from pathlib import Path
 from typing import Annotated
 
 from loguru import logger
+import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
 import typer
 
-from team2_mlops2026.features import FEATURES_DIR, FEATURES_FILE, STATION, TARGETS, TIME
+from team2_mlops2026.features import (
+    FEATURES_DIR,
+    FEATURES_FILE,
+    FORECAST_GAP,
+    STATION,
+    TARGETS,
+    TIME,
+)
 
 PROFILES_FILE = "station_profiles.parquet"
 RUN_NAME = "fit-station-profiles"
@@ -45,6 +58,9 @@ DEFAULT_FIT_END = "2025-10"  # first month of the test period in notebook 1.04
 FIT_END_KEY = "fit_end"  # key of the fit end in the table's metadata (DataFrame.attrs)
 MIN_TRIPS = 500
 VARIANCE_TARGET = 0.9  # keep the components that explain 90% of the variance
+WEEK = "week_start"  # Monday 00:00 of the week the scores apply to
+PROFILE_WEEKS = 4  # history behind each weekly score (1.05)
+MIN_TRIPS_WEEKS = 100  # minimum trips in those weeks for a score (1.05)
 
 HOURS_PER_WEEK = 168
 WEEKDAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
@@ -102,6 +118,57 @@ def first_weeks(features: pd.DataFrame, weeks: int = 4) -> pd.DataFrame:
     return features[features[TIME] < first_hour + pd.Timedelta(weeks=weeks)]
 
 
+def week_start(times: pd.Series) -> pd.Series:
+    """Monday 00:00 of each time's week."""
+    return times.dt.normalize() - pd.to_timedelta(times.dt.day_of_week, unit="D")
+
+
+def weekly_profiles(
+    features: pd.DataFrame,
+    weeks: int = PROFILE_WEEKS,
+    gap: int = FORECAST_GAP,
+    min_trips: int = MIN_TRIPS_WEEKS,
+) -> pd.DataFrame:
+    """Each station's profile for every week of ``features``, from its trips in the ``weeks``
+    weeks that end ``gap`` hours before the week starts.
+
+    Station-weeks with fewer than ``min_trips`` trips get no row. Index: (station, week start);
+    columns: ``PROFILE_COLUMNS``, as in ``hour_of_week_profiles``.
+    """
+    span = weeks * HOURS_PER_WEEK
+    first_week = week_start(features[TIME]).min()
+    stations, rows = np.unique(features[STATION].to_numpy(), return_inverse=True)
+    # the first week starts at column span + gap, so every window lies inside the matrix
+    hours = ((features[TIME] - first_week) // pd.Timedelta(hours=1)).to_numpy() + span + gap
+    n_weeks = (hours.max() - span - gap) // HOURS_PER_WEEK + 1
+    counts = np.zeros((len(TARGETS), len(stations), hours.max() + 1), np.float32)
+    for i, target in enumerate(TARGETS):
+        counts[i, rows, hours] = features[target].to_numpy()
+
+    # A window ends gap hours before a Monday, so its column j is hour of the week (j - gap)
+    by_hour_of_week = (np.arange(HOURS_PER_WEEK) + gap) % HOURS_PER_WEEK
+    windows = []
+    for w in range(n_weeks):
+        end = span + w * HOURS_PER_WEEK
+        window = counts[:, :, end - span : end].reshape(
+            len(TARGETS), len(stations), weeks, HOURS_PER_WEEK
+        )
+        windows.append(np.hstack(list(window.sum(axis=2)[:, :, by_hour_of_week])))
+    profiles = np.concatenate(windows)
+    index = pd.MultiIndex.from_arrays(
+        [
+            np.tile(stations, n_weeks),
+            np.repeat(first_week + pd.to_timedelta(np.arange(n_weeks), unit="W"), len(stations)),
+        ],
+        names=[STATION, WEEK],
+    )
+    total = profiles.sum(axis=1)
+    keep = total >= min_trips
+    return pd.DataFrame(
+        profiles[keep] / total[keep, None], index=index[keep], columns=list(PROFILE_COLUMNS)
+    )
+
+
 def fit_pca(profiles: pd.DataFrame, n_components: float | None = VARIANCE_TARGET) -> PCA:
     """PCA of the profiles: a float in (0, 1) keeps the components that explain that share of
     the variance, an int keeps that many, ``None`` keeps them all."""
@@ -109,7 +176,7 @@ def fit_pca(profiles: pd.DataFrame, n_components: float | None = VARIANCE_TARGET
 
 
 def component_scores(pca: PCA, profiles: pd.DataFrame) -> pd.DataFrame:
-    """Each station's coordinates on the components, as columns ``pc1``, ``pc2``..."""
+    """The profiles' coordinates on the components, as columns ``pc1``, ``pc2``..."""
     columns = [f"pc{i}" for i in range(1, pca.n_components_ + 1)]
     return pd.DataFrame(pca.transform(profiles), index=profiles.index, columns=columns)
 
@@ -132,16 +199,19 @@ def create_profiles(
     fit_end: str = DEFAULT_FIT_END,
     variance: float = VARIANCE_TARGET,
     min_trips: int = MIN_TRIPS,
+    score_min_trips: int = MIN_TRIPS_WEEKS,
 ) -> dict:
-    """Fits the PCA on the profiles before ``fit_end`` and writes each station's scores.
+    """Fits the PCA on the profiles before ``fit_end`` and writes the weekly scores of every
+    station (columns station_id, week_start, pc1...).
 
-    Summary: {path, stations, stations_without_profile, components, explained_variance,
-              explained_variance_pc1..3, explained_variance_ratio}
+    Summary: {path, stations, stations_without_profile (both in the fit), station_weeks,
+              components, explained_variance, explained_variance_pc1..3,
+              explained_variance_ratio}
     """
     features = pd.read_parquet(Path(src) / FEATURES_FILE, columns=[STATION, TIME, *TARGETS])
     profiles = hour_of_week_profiles(features, end=fit_end, min_trips=min_trips)
     pca = fit_pca(profiles, variance)
-    scores = component_scores(pca, profiles)
+    scores = component_scores(pca, weekly_profiles(features, min_trips=score_min_trips))
 
     dest = Path(dst) / PROFILES_FILE
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -157,8 +227,9 @@ def create_profiles(
     ratio = pca.explained_variance_ratio_
     summary = {
         "path": str(dest),
-        "stations": len(scores),
-        "stations_without_profile": int(features[STATION].nunique() - len(scores)),
+        "stations": len(profiles),
+        "stations_without_profile": int(features[STATION].nunique() - len(profiles)),
+        "station_weeks": len(scores),
         "components": int(pca.n_components_),
         "explained_variance": float(ratio.sum()),
         **{f"explained_variance_pc{i + 1}": float(ratio[i]) for i in range(min(3, len(ratio)))},
@@ -179,6 +250,7 @@ def create_profiles_tracked(
     fit_end: str = DEFAULT_FIT_END,
     variance: float = VARIANCE_TARGET,
     min_trips: int = MIN_TRIPS,
+    score_min_trips: int = MIN_TRIPS_WEEKS,
 ) -> dict:
     """``create_profiles()`` inside an MLflow run of the project's experiment.
 
@@ -202,9 +274,12 @@ def create_profiles_tracked(
                 "variance_target": variance,
                 "profile": "share of trips per direction and hour of the week (336 columns)",
                 "scaling": "centred, not scaled",
+                "score_weeks": PROFILE_WEEKS,
+                "score_gap_hours": FORECAST_GAP,
+                "score_min_trips": score_min_trips,
             }
         )
-        summary = create_profiles(src, dst, fit_end, variance, min_trips)
+        summary = create_profiles(src, dst, fit_end, variance, min_trips, score_min_trips)
         tracking.log_files_dataset(
             [dst / PROFILES_FILE], dst, "mibici_station_profiles", "profiles"
         )
@@ -232,9 +307,14 @@ def main(
     min_trips: Annotated[
         int, typer.Option(help="Minimum trips for a station profile")
     ] = MIN_TRIPS,
+    score_min_trips: Annotated[
+        int, typer.Option(help="Minimum trips in a station's last weeks for a weekly score")
+    ] = MIN_TRIPS_WEEKS,
     track: Annotated[bool, typer.Option(help="Log the run to the MLflow server")] = True,
 ):
-    (create_profiles_tracked if track else create_profiles)(src, dst, fit_end, variance, min_trips)
+    (create_profiles_tracked if track else create_profiles)(
+        src, dst, fit_end, variance, min_trips, score_min_trips
+    )
 
 
 if __name__ == "__main__":

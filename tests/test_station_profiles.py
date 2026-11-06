@@ -60,6 +60,21 @@ def test_first_weeks_starts_at_each_station_first_hour(features):
     assert span.loc[7, "min"] == WEEK0 + pd.Timedelta(weeks=2)
 
 
+def test_weekly_profiles_use_the_weeks_known_before_each_week_starts():
+    rows = pd.DataFrame({STATION: 1, TIME: HOURS, "departures": 0, "arrivals": 0})
+    week2 = WEEK0 + pd.Timedelta(weeks=2)
+    rows.loc[rows[TIME] == week2 - pd.Timedelta(hours=49), "departures"] = 5  # Friday 23:00
+    rows.loc[rows[TIME] == week2 - pd.Timedelta(hours=48), "arrivals"] = 5  # Saturday 00:00
+
+    profiles = sp.weekly_profiles(rows, weeks=1, gap=48, min_trips=1)
+
+    assert list(profiles.columns) == list(sp.PROFILE_COLUMNS)
+    assert profiles.loc[(1, week2)].sum() == pytest.approx(1)
+    assert profiles.loc[(1, week2), "departures_fri_23"] == 1  # the Saturday trip comes too late
+    assert profiles.loc[(1, week2 + pd.Timedelta(weeks=1)), "arrivals_sat_00"] == 1
+    assert profiles.index.get_level_values(sp.WEEK).tolist() == [week2, week2 + pd.Timedelta(weeks=1)]
+
+
 def test_first_component_separates_residential_from_work_stations(features):
     profiles = sp.hour_of_week_profiles(features, min_trips=1)
     scores = sp.component_scores(sp.fit_pca(profiles, 2), profiles)
@@ -95,7 +110,9 @@ def test_create_profiles_tracked_logs_input_output_and_variance(features, tmp_pa
     output = src / sp.PROFILES_FILE
     assert datasets["mibici_station_profiles"].digest == tracking.files_digest([output], src)
     scores = pd.read_parquet(output)
-    assert list(scores.columns) == [STATION, *(f"pc{i}" for i in range(1, summary["components"] + 1))]
+    components = [f"pc{i}" for i in range(1, summary["components"] + 1)]
+    assert list(scores.columns) == [STATION, sp.WEEK, *components]
+    assert (scores[sp.WEEK].dt.day_of_week == 0).all() and len(scores) == summary["station_weeks"]
     assert run.data.params["fit_end"] == scores.attrs[sp.FIT_END_KEY] == "2024-02"
     assert run.data.metrics["stations"] == 6
     assert run.data.metrics["explained_variance"] >= sp.VARIANCE_TARGET

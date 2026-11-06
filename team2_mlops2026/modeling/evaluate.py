@@ -4,13 +4,16 @@ Evaluation of the station-hour demand forecasts, as fixed by the ML Canvas
 
 - Count metrics: MAE, RMSE, WAPE and mean Poisson deviance. WAPE divides the total error by the
   total demand, so the many zero hours do not blow it up as a per-row percentage error would.
+  Each segment also gets the daily WAPE, the WAPE of the station-day totals.
 - Segments: overall, weekday peak hours, the top-50 stations, demand groups and the stations
   unseen in training. Stations are ranked on the training split, so the test rows never choose
   their own segment.
 - Decision metric: how well the forecasts flag the high-imbalance station-days, the days whose
   net flow exceeds half of the station's capacity.
 - Rolling-origin folds: train on every hour before a month, test on that month, move one month on.
-- Success criterion: what a model must achieve against the best baseline.
+- Success criterion: what a model must achieve against the best baseline. The demand groups
+  are compared on the daily WAPE: in the quietest group most hours have no trip, and there the
+  hourly WAPE is lowest for a forecast of zero (notebook 2.02).
 
 Usage (notebook):
     from team2_mlops2026.modeling.evaluate import rolling_origin_splits, segment_report
@@ -28,6 +31,7 @@ from sklearn.metrics import mean_poisson_deviance
 from team2_mlops2026.features import STATION, TIME, WEEKDAY, time_split
 
 METRICS = ("mae", "rmse", "wape", "poisson_deviance")
+DAILY_WAPE = "daily_wape"
 # Monday-Friday, one hour around the commuter peaks at 8:00 and 18:00 (notebook 1.03)
 PEAK_HOURS = (7, 8, 9, 17, 18, 19)
 TOP_STATIONS = 50
@@ -71,6 +75,17 @@ def count_metrics(y_true, y_pred) -> dict[str, float]:
     }
 
 
+def daily_wape(y_true, y_pred, station_day) -> float:
+    """WAPE of the station-day totals, where ``station_day`` labels each row's station and day
+    with an integer code. NaN when there is no demand."""
+    y_true = np.asarray(y_true, dtype="float64")
+    demand = y_true.sum()
+    if demand <= 0:
+        return np.nan
+    error = np.bincount(station_day, y_true - np.asarray(y_pred, dtype="float64"))
+    return float(np.abs(error).sum() / demand)
+
+
 # --- segments ------------------------------------------------------------------
 
 
@@ -98,7 +113,8 @@ def station_segments(
 
 
 def segment_report(test: pd.DataFrame, y_pred, target: str, train: pd.DataFrame) -> pd.DataFrame:
-    """``count_metrics`` of the ``target`` forecasts per segment, one row each."""
+    """``count_metrics`` and ``daily_wape`` of the ``target`` forecasts per segment, one row
+    each."""
     segments = station_segments(train, target)
     station = test[STATION]
     group = station.map(segments["group"]).to_numpy()
@@ -110,8 +126,15 @@ def segment_report(test: pd.DataFrame, y_pred, target: str, train: pd.DataFrame)
         "unseen_stations": np.isnan(group),
     }
     y_true, y_pred = test[target].to_numpy(), np.asarray(y_pred)
+    station_day = test.groupby([STATION, test[TIME].dt.floor("D")]).ngroup().to_numpy()
     report = pd.DataFrame.from_dict(
-        {name: count_metrics(y_true[mask], y_pred[mask]) for name, mask in masks.items()},
+        {
+            name: {
+                **count_metrics(y_true[mask], y_pred[mask]),
+                DAILY_WAPE: daily_wape(y_true[mask], y_pred[mask], station_day[mask]),
+            }
+            for name, mask in masks.items()
+        },
         orient="index",
     )
     report.index.name = "segment"
@@ -217,8 +240,8 @@ def success_criterion(report: pd.DataFrame, baselines: Mapping[str, pd.DataFrame
     """Checks a model's ``segment_report`` against the baseline with the lowest peak-hour WAPE.
 
     The model passes if its peak-hour WAPE is at least ``MIN_IMPROVEMENT`` lower and no demand
-    group has a higher WAPE than under that baseline. A group whose WAPE is undefined is not
-    compared.
+    group has a higher daily WAPE than under that baseline. A group whose daily WAPE is
+    undefined is not compared.
     """
     peak_wapes = {name: b.loc["peak", "wape"] for name, b in baselines.items()}
     if not np.isfinite([report.loc["peak", "wape"], *peak_wapes.values()]).all():
@@ -229,5 +252,7 @@ def success_criterion(report: pd.DataFrame, baselines: Mapping[str, pd.DataFrame
     return SuccessCheck(
         baseline=name,
         peak_wape_improvement=float(1 - report.loc["peak", "wape"] / baseline.loc["peak", "wape"]),
-        worse_groups=tuple(g for g in groups if report.loc[g, "wape"] > baseline.loc[g, "wape"]),
+        worse_groups=tuple(
+            g for g in groups if report.loc[g, DAILY_WAPE] > baseline.loc[g, DAILY_WAPE]
+        ),
     )

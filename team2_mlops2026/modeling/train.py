@@ -5,10 +5,10 @@ data/processed/mibici/features/ -> one MLflow run per model and target
 - Each model is fitted on the hours before ``TEST_START`` and scored on the later hours with
   ``evaluate.segment_report``. There is one model per target (departures, arrivals).
 - The models are the baselines and the ML candidates of ``models.MODELS``.
-- The inputs are the station-hour features plus each station's PCA profile scores
-  (``station_profiles``). A station without a profile gets NaN. A test split that starts before
-  the fit end the profiles table records is rejected, since the scores would carry test-period
-  demand.
+- The inputs are the station-hour features plus the station's PCA profile scores of the week
+  (``station_profiles``). A station-week without scores gets NaN. A test split that starts before
+  the fit end the profiles table records is rejected, since the components would carry
+  test-period demand.
 - Every run logs the feature and profile tables as input datasets, with the digests of the steps
   that wrote them, plus the model's params, the segment metrics, the fit time, the model size
   and the fitted model.
@@ -38,10 +38,17 @@ from sklearn.base import BaseEstimator
 from sklearn.pipeline import Pipeline
 import typer
 
-from team2_mlops2026.features import FEATURES_DIR, FEATURES_FILE, STATION, TARGETS, time_split
+from team2_mlops2026.features import (
+    FEATURES_DIR,
+    FEATURES_FILE,
+    STATION,
+    TARGETS,
+    TIME,
+    time_split,
+)
 from team2_mlops2026.modeling.evaluate import TEST_START, segment_report
 from team2_mlops2026.modeling.models import MODELS, TRUSTED_TYPES
-from team2_mlops2026.station_profiles import FIT_END_KEY, PROFILES_FILE
+from team2_mlops2026.station_profiles import FIT_END_KEY, PROFILES_FILE, WEEK, week_start
 
 RUN_PREFIX = "train"
 MODEL_ARTIFACT = "model"
@@ -64,8 +71,8 @@ class TrainedModel:
 
 
 def load_profiles(src: str | Path = FEATURES_DIR) -> tuple[pd.DataFrame, str]:
-    """The first ``PROFILE_COMPONENTS`` profile scores of each station, and the ``fit_end`` that
-    their table records."""
+    """The first ``PROFILE_COMPONENTS`` weekly profile scores of each station, and the
+    ``fit_end`` that their table records."""
     scores = pd.read_parquet(Path(src) / PROFILES_FILE)
     if FIT_END_KEY not in scores.attrs:
         raise ValueError(
@@ -74,15 +81,17 @@ def load_profiles(src: str | Path = FEATURES_DIR) -> tuple[pd.DataFrame, str]:
         )
     fit_end = scores.attrs[FIT_END_KEY]
     components = [f"pc{i}" for i in range(1, PROFILE_COMPONENTS + 1) if f"pc{i}" in scores]
-    return scores[[STATION, *components]].astype(dict.fromkeys(components, "float32")), fit_end
+    scores = scores[[STATION, WEEK, *components]].astype(dict.fromkeys(components, "float32"))
+    return scores, fit_end
 
 
 def load_training_data(
     src: str | Path = FEATURES_DIR, test_start: str = TEST_START
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Station-hour features with each station's profile scores, split at ``test_start``.
+    """Station-hour features with the station's profile scores of the week, split at
+    ``test_start``.
 
-    A ``test_start`` before the profiles' fit end is rejected, since the scores would carry
+    A ``test_start`` before the profiles' fit end is rejected, since the components would carry
     test-period demand.
     """
     src = Path(src)
@@ -92,7 +101,9 @@ def load_training_data(
             f"The test split starts at {test_start}, before the profiles' fit end "
             f"{fit_end}: refit the profiles with --fit-end {test_start} or earlier"
         )
-    features = pd.read_parquet(src / FEATURES_FILE).merge(scores, on=STATION, how="left")
+    features = pd.read_parquet(src / FEATURES_FILE)
+    features[WEEK] = week_start(features[TIME]).astype(scores[WEEK].dtype)
+    features = features.merge(scores, on=[STATION, WEEK], how="left").drop(columns=WEEK)
     return time_split(features, test_start)
 
 

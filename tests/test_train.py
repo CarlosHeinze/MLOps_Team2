@@ -37,16 +37,20 @@ def lineage(tmp_path, mlflow_store):
     STATIONS.to_parquet(interim / "estaciones" / "nomenclatura_2024_01.parquet", index=False)
 
     features = ft.create_features_tracked(processed, interim, dst, start=str(START.date()))
-    profiles = sp.create_profiles_tracked(dst, dst, fit_end=TEST_START, min_trips=1)
+    profiles = sp.create_profiles_tracked(
+        dst, dst, fit_end=TEST_START, min_trips=1, score_min_trips=1
+    )
     return {"dir": dst, "features": features, "profiles": profiles}
 
 
 def test_training_data_joins_the_profiles_and_splits_in_time(lineage):
     train, test = tr.load_training_data(lineage["dir"], TEST_START)
     assert train[ft.TIME].max() < pd.Timestamp(TEST_START) == test[ft.TIME].min()
-    assert "pc1" in train.columns and train["pc1"].notna().all()
+    first_week = train[ft.TIME] < START + pd.Timedelta(weeks=1)
+    assert train.loc[first_week, "pc1"].isna().all()  # no history before the table starts
+    assert train.loc[~first_week, "pc1"].notna().all()
     new = test[test[ft.STATION] == 3]
-    assert len(new) and new["pc1"].isna().all()  # opened after the profiles were fitted
+    assert len(new) and new["pc1"].isna().all()  # opened in the week it is forecast
     assert not set(ft.TARGETS) & set(tr.model_inputs(test).columns)
 
 
