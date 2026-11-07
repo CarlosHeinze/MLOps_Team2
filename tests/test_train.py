@@ -54,6 +54,15 @@ def test_training_data_joins_the_profiles_and_splits_in_time(lineage):
     assert not set(ft.TARGETS) & set(tr.model_inputs(test).columns)
 
 
+def test_features_can_be_read_for_a_window_of_hours(lineage):
+    start, end = START + pd.Timedelta(weeks=2), pd.Timestamp(TEST_START)
+    window = tr.load_features(lineage["dir"], TEST_START, start=str(start), end=TEST_START)
+    assert window[ft.TIME].min() == start and window[ft.TIME].max() < end
+    train, _ = tr.load_training_data(lineage["dir"], TEST_START)
+    expected = train[train[ft.TIME] >= start].reset_index(drop=True)
+    pd.testing.assert_frame_equal(window.reset_index(drop=True), expected)
+
+
 def test_a_test_split_before_the_profiles_fit_end_is_rejected(lineage):
     # The fit end comes from the profiles table, not from the caller
     with pytest.raises(ValueError, match="before the profiles' fit end 2024-02-26"):
