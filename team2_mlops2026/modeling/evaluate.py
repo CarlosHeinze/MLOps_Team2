@@ -11,9 +11,11 @@ Evaluation of the station-hour demand forecasts, as fixed by the ML Canvas
 - Decision metric: how well the forecasts flag the high-imbalance station-days, the days whose
   net flow exceeds half of the station's capacity.
 - Rolling-origin folds: train on every hour before a month, test on that month, move one month on.
+  ``aggregate_folds`` summarizes the folds' reports as their mean and standard deviation.
 - Success criterion: what a model must achieve against the best baseline. The demand groups
   are compared on the daily WAPE: in the quietest group most hours have no trip, and there the
-  hourly WAPE is lowest for a forecast of zero (notebook 2.02).
+  hourly WAPE is lowest for a forecast of zero (notebook 2.02). ``rank_candidates`` applies it
+  to every candidate and ranks them, so the first one that passes is the champion.
 
 Usage (notebook):
     from team2_mlops2026.modeling.evaluate import rolling_origin_splits, segment_report
@@ -21,7 +23,7 @@ Usage (notebook):
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Collection, Iterable, Mapping
 from dataclasses import dataclass
 
 import numpy as np
@@ -112,9 +114,16 @@ def station_segments(
     )
 
 
-def segment_report(test: pd.DataFrame, y_pred, target: str, train: pd.DataFrame) -> pd.DataFrame:
+def segment_report(
+    test: pd.DataFrame,
+    y_pred,
+    target: str,
+    train: pd.DataFrame,
+    stations: Mapping[str, Collection] | None = None,
+) -> pd.DataFrame:
     """``count_metrics`` and ``daily_wape`` of the ``target`` forecasts per segment, one row
-    each."""
+    each. ``stations`` adds one segment per named set of station ids, such as the stations
+    opened in a given period."""
     segments = station_segments(train, target)
     station = test[STATION]
     group = station.map(segments["group"]).to_numpy()
@@ -124,6 +133,7 @@ def segment_report(test: pd.DataFrame, y_pred, target: str, train: pd.DataFrame)
         f"top_{TOP_STATIONS}": station.isin(segments.index[segments["top"]]).to_numpy(),
         **{f"group_{g}": group == g for g in range(1, segments["group"].max() + 1)},
         "unseen_stations": np.isnan(group),
+        **{name: station.isin(list(ids)).to_numpy() for name, ids in (stations or {}).items()},
     }
     y_true, y_pred = test[target].to_numpy(), np.asarray(y_pred)
     station_day = test.groupby([STATION, test[TIME].dt.floor("D")]).ngroup().to_numpy()
@@ -139,6 +149,23 @@ def segment_report(test: pd.DataFrame, y_pred, target: str, train: pd.DataFrame)
     )
     report.index.name = "segment"
     return report
+
+
+def grouped_metrics(frame: pd.DataFrame, y_true, y_pred, by) -> pd.DataFrame:
+    """``count_metrics`` of the forecasts per value of ``by`` (one key per row of ``frame``),
+    such as the hour of the day or the month, one row each."""
+    y_true = np.asarray(y_true, dtype="float64")
+    y_pred = np.asarray(y_pred, dtype="float64")
+    keys = pd.Series(np.asarray(by), index=frame.index)
+    table = pd.DataFrame.from_dict(
+        {
+            key: count_metrics(y_true[rows], y_pred[rows])
+            for key, rows in keys.groupby(keys, sort=True).indices.items()
+        },
+        orient="index",
+    )
+    table.index.name = getattr(by, "name", None)
+    return table
 
 
 # --- decision metric -----------------------------------------------------------
@@ -222,6 +249,23 @@ def rolling_origin_splits(
     return folds
 
 
+def aggregate_folds(reports: Mapping[str, pd.DataFrame]) -> pd.DataFrame:
+    """Mean and standard deviation over the folds of every segment metric.
+
+    ``reports`` maps each fold to its ``segment_report``. The result has one row per segment, in
+    the order of the first fold, and the columns (metric, "mean") and (metric, "std"). A value
+    that is undefined in a fold (NaN) is left out of that segment's statistics, and the standard
+    deviation of a single fold is NaN. ``.xs("mean", axis=1, level=1)`` has the shape of a
+    ``segment_report``, so the mean report can go through ``success_criterion``.
+    """
+    if not reports:
+        raise ValueError("No fold reports to aggregate")
+    order = next(iter(reports.values())).index
+    stacked = pd.concat(reports, names=["fold"])
+    summary = stacked.groupby(level="segment").agg(["mean", "std"])
+    return summary.reindex([*order, *summary.index.difference(order)])
+
+
 # --- success criterion ---------------------------------------------------------
 
 
@@ -256,3 +300,30 @@ def success_criterion(report: pd.DataFrame, baselines: Mapping[str, pd.DataFrame
             g for g in groups if report.loc[g, DAILY_WAPE] > baseline.loc[g, DAILY_WAPE]
         ),
     )
+
+
+def rank_candidates(reports: Mapping[str, pd.DataFrame], baselines: Iterable[str]) -> pd.DataFrame:
+    """``success_criterion`` of every model of ``reports`` that is not a baseline, ranked.
+
+    ``reports`` maps each model to its segment report for one target, such as the mean report
+    of the backtest, and must include the ``baselines``. The models that pass come first, each
+    group ordered by peak-hour WAPE, so the first row is the champion if it passed. Columns:
+    peak_wape, baseline, peak_wape_improvement, worse_groups and passed.
+    """
+    baselines = {name: reports[name] for name in baselines}
+    rows = {}
+    for name, report in reports.items():
+        if name in baselines:
+            continue
+        check = success_criterion(report, baselines)
+        rows[name] = {
+            "peak_wape": float(report.loc["peak", "wape"]),
+            "baseline": check.baseline,
+            "peak_wape_improvement": check.peak_wape_improvement,
+            "worse_groups": ", ".join(check.worse_groups),
+            "passed": check.passed,
+        }
+    if not rows:
+        raise ValueError("No candidates to rank besides the baselines")
+    table = pd.DataFrame.from_dict(rows, orient="index").rename_axis("model")
+    return table.sort_values(["passed", "peak_wape"], ascending=[False, True], kind="stable")

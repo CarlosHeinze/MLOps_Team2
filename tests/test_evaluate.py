@@ -111,6 +111,31 @@ def test_segment_report_scores_each_segment_on_its_own_rows():
     assert result.loc["unseen_stations", ev.DAILY_WAPE] == 1
 
 
+def test_segment_report_adds_a_segment_per_named_set_of_stations():
+    train = station_hours([1, 2], MONDAY, 24, departures=1)
+    test = station_hours([1, 2, 3], MONDAY + pd.Timedelta(days=1), 24, departures=2)
+    y_pred = np.where(test[STATION] == 3, 1, 2)
+
+    result = ev.segment_report(
+        test, y_pred, "departures", train, stations={"new_stations": [3], "closed": [9]}
+    )
+
+    assert list(result.index[-2:]) == ["new_stations", "closed"]
+    assert result.loc["new_stations", "n"] == 24
+    assert result.loc["new_stations", "wape"] == pytest.approx(0.5)
+    assert result.loc["closed", "n"] == 0 and np.isnan(result.loc["closed", "wape"])
+
+
+def test_grouped_metrics_score_each_key_on_its_own_rows():
+    frame = station_hours([1], MONDAY, 4)
+    hours = frame[TIME].dt.hour.rename("hour")
+    result = ev.grouped_metrics(frame, [2, 2, 2, 4], [2, 1, 3, 2], hours % 2)
+    assert result.index.name == "hour"
+    assert list(result.index) == [0, 1]
+    assert result.loc[0, "n"] == 2 and result.loc[0, "wape"] == pytest.approx(1 / 4)  # rows 0, 2
+    assert result.loc[1, "wape"] == pytest.approx(3 / 6)  # rows 1, 3
+
+
 # --- decision metric -----------------------------------------------------------
 
 
@@ -187,6 +212,30 @@ def test_folds_need_data_before_the_first_and_in_every_test_month(table):
         ev.rolling_origin_splits(gap)
 
 
+def test_aggregate_folds_takes_the_mean_and_std_of_each_segment_metric():
+    folds = {
+        "2025-10": pd.DataFrame(
+            {"n": [10, 5], "wape": [0.5, 0.2]}, index=pd.Index(["overall", "peak"], name="segment")
+        ),
+        "2025-11": pd.DataFrame(
+            {"n": [20, 0], "wape": [0.7, np.nan]},
+            index=pd.Index(["overall", "peak"], name="segment"),
+        ),
+    }
+    summary = ev.aggregate_folds(folds)
+    assert list(summary.index) == ["overall", "peak"]
+    assert summary.loc["overall", ("wape", "mean")] == pytest.approx(0.6)
+    assert summary.loc["overall", ("wape", "std")] == pytest.approx(np.std([0.5, 0.7], ddof=1))
+    assert summary.loc["overall", ("n", "mean")] == 15
+    # An undefined value is left out, so the peak mean is the first fold's alone
+    assert summary.loc["peak", ("wape", "mean")] == pytest.approx(0.2)
+    assert np.isnan(summary.loc["peak", ("wape", "std")])
+    mean = summary.xs("mean", axis=1, level=1)
+    assert list(mean.columns) == ["n", "wape"]
+    with pytest.raises(ValueError, match="No fold reports"):
+        ev.aggregate_folds({})
+
+
 # --- success criterion ---------------------------------------------------------
 
 
@@ -223,3 +272,22 @@ def test_success_is_not_decided_without_peak_hour_demand():
     baselines = {"seasonal_naive": report(np.nan, 0.5), "historical_average": report(np.nan, 0.6)}
     with pytest.raises(ValueError, match="Peak-hour WAPE is undefined"):
         ev.success_criterion(report(np.nan, 0.5), baselines)
+
+
+def test_rank_candidates_puts_the_passing_models_first_by_peak_wape():
+    reports = {
+        "seasonal_naive": report(0.40, 0.5),
+        "historical_average": report(0.30, 0.6),
+        "fast_but_unfair": report(0.10, 0.7),  # worse than the baseline in group 1
+        "close": report(0.26, 0.5),
+        "best": report(0.20, 0.4),
+        "not_enough": report(0.29, 0.4),
+    }
+    table = ev.rank_candidates(reports, ["seasonal_naive", "historical_average"])
+    assert list(table.index) == ["best", "close", "fast_but_unfair", "not_enough"]
+    assert table["passed"].tolist() == [True, True, False, False]
+    assert table.loc["best", "baseline"] == "historical_average"
+    assert table.loc["best", "peak_wape_improvement"] == pytest.approx(1 - 0.20 / 0.30)
+    assert table.loc["fast_but_unfair", "worse_groups"] == "group_1"
+    with pytest.raises(ValueError, match="No candidates"):
+        ev.rank_candidates({"seasonal_naive": report(0.4, 0.5)}, ["seasonal_naive"])

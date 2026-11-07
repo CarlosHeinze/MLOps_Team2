@@ -1,13 +1,15 @@
 """
-Matplotlib charts for the EDA notebooks (tables live in ``eda.py``).
+Matplotlib charts for the notebooks (the EDA tables live in ``eda.py``) and for the figures the
+backtest logs to MLflow.
 
 Every function takes already-aggregated data or a frame, returns the Figure and never
-calls ``plt.show()``, so the same charts can be saved to ``reports/figures``.
+calls ``plt.show()``, so the same charts can be saved to ``reports/figures`` or logged with
+``mlflow.log_figure``.
 """
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 import matplotlib as mpl
 from matplotlib import font_manager
@@ -155,12 +157,24 @@ def plot_grouped_bars(
 
 
 def plot_lines(
-    df: pd.DataFrame, title: str, ylabel: str, xlabel: str = "", figsize=(12, 4)
+    df: pd.DataFrame,
+    title: str,
+    ylabel: str,
+    xlabel: str = "",
+    figsize=(12, 4),
+    muted: Sequence = (),
 ) -> plt.Figure:
-    """One line per column; a legend names them when there is more than one."""
+    """One line per column; a legend names them when there is more than one.
+
+    The ``muted`` columns, such as the baselines next to the models, are drawn dashed and grey
+    and do not take one of the three series colours.
+    """
     fig, ax = plt.subplots(figsize=figsize)
-    for col, color in zip(df.columns, _colors(df.columns)):
+    shown = [c for c in df.columns if c not in muted]
+    for col, color in zip(shown, _colors(shown)):
         ax.plot(df.index, df[col], color=color, label=str(col))
+    for col, style in zip([c for c in df.columns if c in muted], ("--", ":", "-.")):
+        ax.plot(df.index, df[col], color=MUTED, linestyle=style, linewidth=1.5, label=str(col))
     if len(df.columns) > 1:
         ax.legend()
     ax.set(title=title, xlabel=xlabel, ylabel=ylabel)
@@ -459,5 +473,76 @@ def plot_param_effects(
     if highlight is not None:
         axes[0, 0].legend(fontsize=8)
     fig.suptitle(title, fontweight="bold")
+    fig.tight_layout()
+    return fig
+
+
+# --- backtest -----------------------------------------------------------------------
+
+
+def plot_station_forecasts(
+    panels: Mapping[str, pd.DataFrame], title: str, ylabel: str, actual: str = "actual"
+) -> plt.Figure:
+    """One panel per station, stacked, each with the ``actual`` column in black and up to three
+    forecast columns in the series colours, against its index (the hours)."""
+    fig, axes = plt.subplots(
+        len(panels), 1, figsize=(12, 2.8 * len(panels)), squeeze=False, sharex=False
+    )
+    for ax, (label, frame) in zip(axes[:, 0], panels.items()):
+        ax.plot(frame.index, frame[actual], color=INK, linewidth=1.2, label=actual)
+        forecasts = [c for c in frame.columns if c != actual]
+        for col, color in zip(forecasts, _colors(forecasts)):
+            ax.plot(frame.index, frame[col], color=color, linewidth=1.5, label=str(col))
+        ax.set(title=str(label), ylabel=ylabel)
+    axes[0, 0].legend(fontsize=8, ncols=1 + len(panels[next(iter(panels))].columns))
+    fig.suptitle(title, fontweight="bold")
+    fig.tight_layout()
+    return fig
+
+
+def plot_residuals(
+    residuals: pd.DataFrame, title: str, quantiles: tuple[float, float] = (0.001, 0.999)
+) -> plt.Figure:
+    """Histogram of each column of ``residuals`` (actual - forecast), one panel each, clipped
+    to the ``quantiles``, with the mean as a dashed line. The count axis is logarithmic, since
+    the residuals of the many quiet hours sit around 0."""
+    fig, axes = plt.subplots(
+        1, len(residuals.columns), figsize=(5.5 * len(residuals.columns), 3.8), squeeze=False
+    )
+    for ax, col in zip(axes[0], residuals.columns):
+        values = residuals[col].dropna().to_numpy()
+        low, high = np.quantile(values, quantiles)
+        bins = 80
+        if np.all(np.mod(values, 1) == 0):  # integer residuals: one bin per value, no gaps
+            bins = np.arange(np.floor(low), np.ceil(high) + 2) - 0.5
+        ax.hist(values, bins=bins, range=(low - 0.5, high + 0.5), color=SERIES[0], log=True)
+        ax.axvline(values.mean(), color=SERIES[1], linestyle="--", linewidth=1.2)
+        ax.set(
+            title=f"{col} (mean {values.mean():+.3f})",
+            xlabel="actual - forecast",
+            ylabel="station-hours",
+        )
+    fig.suptitle(
+        f"{title} (p{quantiles[0] * 100:g} to p{quantiles[1] * 100:g})", fontweight="bold"
+    )
+    fig.tight_layout()
+    return fig
+
+
+def plot_importance(importance: pd.DataFrame, title: str, top: int = 15) -> plt.Figure:
+    """Horizontal bars of the ``top`` features by the ``mean`` column, the largest on top, with
+    the ``std`` column as error bars (a permutation importance)."""
+    shown = importance.sort_values("mean", ascending=False).head(top).iloc[::-1]
+    fig, ax = plt.subplots(figsize=(7, 0.35 * len(shown) + 1.5))
+    ax.barh(
+        shown.index.astype(str),
+        shown["mean"],
+        xerr=shown["std"],
+        color=SERIES[0],
+        error_kw={"ecolor": INK_SECONDARY, "elinewidth": 1},
+    )
+    ax.axvline(0, color=AXIS, linewidth=1)
+    ax.set(title=title, xlabel="increase in Poisson deviance when shuffled")
+    ax.grid(axis="y", visible=False)
     fig.tight_layout()
     return fig
