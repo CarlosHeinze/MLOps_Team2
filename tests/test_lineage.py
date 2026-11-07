@@ -2,11 +2,15 @@
 
 from test_raw_data_extraction import FakeResponse, FakeSession
 from test_raw_data_normalization import raw_dir  # noqa: F401  (fixture: every raw variant)
+from test_train import TEST_START, lineage  # noqa: F401  (fixture: tracked features, profiles)
 
 from team2_mlops2026.data import interim_data_cleaning as idc
 from team2_mlops2026.data import raw_data_extraction as rde
 from team2_mlops2026.data import raw_data_normalization as rdn
+from team2_mlops2026.modeling import train as tr
 from team2_mlops2026.tracking import input_digests
+
+FEATURES, PROFILES = "mibici_station_hour_features", "mibici_station_profiles"
 
 
 def digests(summary: dict) -> dict[str, str]:
@@ -19,7 +23,9 @@ def test_tracked_steps_chain_from_raw_to_processed(raw_dir, tmp_path, mlflow_sto
     files = rde.raw_csv_files(raw_dir)
     page = "".join(f'<a href="/files/{p.name}">{p.name}</a>' for p in files)
     site = {rde.PAGE_URL: FakeResponse(page.encode())}
-    site.update({f"https://mibici.net/files/{p.name}": FakeResponse(p.read_bytes()) for p in files})
+    site.update(
+        {f"https://mibici.net/files/{p.name}": FakeResponse(p.read_bytes()) for p in files}
+    )
     raw, interim, processed = tmp_path / "downloaded", tmp_path / "interim", tmp_path / "processed"
 
     extracted = digests(rde.ingest_tracked(raw, session_factory=lambda: FakeSession(site)))
@@ -29,3 +35,14 @@ def test_tracked_steps_chain_from_raw_to_processed(raw_dir, tmp_path, mlflow_sto
     assert extracted[rde.RAW_DATASET] == normalized[rde.RAW_DATASET]
     assert normalized["mibici_trips_interim"] == cleaned["mibici_trips_interim"]
     assert normalized["mibici_stations"] == cleaned["mibici_stations"]
+
+
+def test_model_runs_read_the_tables_the_feature_steps_wrote(lineage):  # noqa: F811
+    features = digests(lineage["features"])
+    profiles = digests(lineage["profiles"])
+    (model,) = tr.train_tracked(["seasonal_naive"], ["departures"], lineage["dir"], TEST_START)
+    trained = input_digests(model.run_id)
+
+    # features -> profiles -> model: the model run read the tables both steps wrote
+    assert features[FEATURES] == profiles[FEATURES] == trained[FEATURES]
+    assert profiles[PROFILES] == trained[PROFILES]
