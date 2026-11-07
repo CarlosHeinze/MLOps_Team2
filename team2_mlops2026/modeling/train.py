@@ -12,10 +12,13 @@ data/processed/mibici/features/ -> one MLflow run per model and target
 - Every run logs the feature and profile tables as input datasets, with the digests of the steps
   that wrote them, plus the model's params, the segment metrics, the fit time, the model size
   and the fitted model.
+- ``tune`` searches the hyperparameters of the finalists inside the training split
+  (``modeling.tuning``).
 
 Usage (CLI):
-    python -m team2_mlops2026.modeling.train
-    python -m team2_mlops2026.modeling.train --model lgbm_poisson --target departures --no-track
+    python -m team2_mlops2026.modeling.train fit
+    python -m team2_mlops2026.modeling.train fit --model lgbm_poisson --target departures --no-track
+    python -m team2_mlops2026.modeling.train tune --model lgbm_tweedie --n-trials 20
 
 Usage (notebook):
     from team2_mlops2026.modeling.train import load_training_data, train_tracked
@@ -85,11 +88,14 @@ def load_profiles(src: str | Path = FEATURES_DIR) -> tuple[pd.DataFrame, str]:
     return scores, fit_end
 
 
-def load_training_data(
-    src: str | Path = FEATURES_DIR, test_start: str = TEST_START
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Station-hour features with the station's profile scores of the week, split at
-    ``test_start``.
+def load_features(
+    src: str | Path = FEATURES_DIR,
+    test_start: str = TEST_START,
+    start: str | None = None,
+    end: str | None = None,
+) -> pd.DataFrame:
+    """Station-hour features with the station's profile scores of the week, from the hours in
+    [``start``, ``end``) only, if given.
 
     A ``test_start`` before the profiles' fit end is rejected, since the components would carry
     test-period demand.
@@ -101,10 +107,18 @@ def load_training_data(
             f"The test split starts at {test_start}, before the profiles' fit end "
             f"{fit_end}: refit the profiles with --fit-end {test_start} or earlier"
         )
-    features = pd.read_parquet(src / FEATURES_FILE)
+    window = [(TIME, ">=", pd.Timestamp(start))] if start else []
+    window += [(TIME, "<", pd.Timestamp(end))] if end else []
+    features = pd.read_parquet(src / FEATURES_FILE, filters=window or None)
     features[WEEK] = week_start(features[TIME]).astype(scores[WEEK].dtype)
-    features = features.merge(scores, on=[STATION, WEEK], how="left").drop(columns=WEEK)
-    return time_split(features, test_start)
+    return features.merge(scores, on=[STATION, WEEK], how="left").drop(columns=WEEK)
+
+
+def load_training_data(
+    src: str | Path = FEATURES_DIR, test_start: str = TEST_START
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """``load_features``, split at ``test_start``."""
+    return time_split(load_features(src, test_start), test_start)
 
 
 def model_inputs(frame: pd.DataFrame) -> pd.DataFrame:
@@ -129,7 +143,7 @@ def report_metrics(report: pd.DataFrame) -> dict[str, float]:
     }
 
 
-def _check_names(models: Sequence[str], targets: Sequence[str]) -> None:
+def check_names(models: Sequence[str], targets: Sequence[str]) -> None:
     unknown = [m for m in models if m not in MODELS] + [t for t in targets if t not in TARGETS]
     if unknown:
         raise ValueError(
@@ -162,12 +176,43 @@ def train(
     test_start: str = TEST_START,
 ) -> list[TrainedModel]:
     """Trains every model for every target on the same split."""
-    _check_names(models, targets)
+    check_names(models, targets)
     train_rows, test_rows = load_training_data(src, test_start)
     return [
         train_model(name, target, train_rows, test_rows)
         for name, target in product(models, targets)
     ]
+
+
+def log_inputs(src: Path) -> None:
+    """Logs the feature and profile tables as inputs of the active MLflow run."""
+    from team2_mlops2026 import tracking
+
+    tracking.log_files_dataset(
+        [src / FEATURES_FILE], src, "mibici_station_hour_features", "features"
+    )
+    tracking.log_files_dataset([src / PROFILES_FILE], src, "mibici_station_profiles", "profiles")
+
+
+def log_model(estimator: BaseEstimator, example: pd.DataFrame) -> None:
+    """Logs ``estimator`` as the active run's model, with a signature and an input example, and
+    the size of its skops file as ``model_size_mb``."""
+    import mlflow
+    from mlflow.models import infer_signature
+    import mlflow.sklearn
+    import skops.io
+
+    mlflow.log_metric("model_size_mb", len(skops.io.dumps(estimator)) / 1e6)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")  # hint that integer columns cannot hold NaN
+        signature = infer_signature(example, estimator.predict(example))
+    mlflow.sklearn.log_model(
+        estimator,
+        name=MODEL_ARTIFACT,
+        signature=signature,
+        input_example=example,
+        skops_trusted_types=TRUSTED_TYPES,
+    )
 
 
 def train_tracked(
@@ -186,13 +231,10 @@ def train_tracked(
     - the fitted model, with a signature and an input example
     """
     import mlflow
-    from mlflow.models import infer_signature
-    import mlflow.sklearn
-    import skops.io
 
     from team2_mlops2026 import tracking
 
-    _check_names(models, targets)
+    check_names(models, targets)
     src = Path(src)
     _, profiles_fit_end = load_profiles(src)
     train_rows, test_rows = load_training_data(src, test_start)
@@ -200,12 +242,7 @@ def train_tracked(
     results = []
     for name, target in product(models, targets):
         with tracking.start_run(f"{RUN_PREFIX}-{name}-{target}") as run:
-            tracking.log_files_dataset(
-                [src / FEATURES_FILE], src, "mibici_station_hour_features", "features"
-            )
-            tracking.log_files_dataset(
-                [src / PROFILES_FILE], src, "mibici_station_profiles", "profiles"
-            )
+            log_inputs(src)
             result = train_model(name, target, train_rows, test_rows)
             mlflow.set_tags(
                 {
@@ -225,44 +262,52 @@ def train_tracked(
                 }
             )
             mlflow.log_metrics(
-                {
-                    **report_metrics(result.report),
-                    "fit_seconds": result.fit_seconds,
-                    # the size of the skops file MLflow stores as the model
-                    "model_size_mb": len(skops.io.dumps(result.estimator)) / 1e6,
-                }
+                {**report_metrics(result.report), "fit_seconds": result.fit_seconds}
             )
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")  # hint that integer columns cannot hold NaN
-                signature = infer_signature(example, result.estimator.predict(example))
-            mlflow.sklearn.log_model(
-                result.estimator,
-                name=MODEL_ARTIFACT,
-                signature=signature,
-                input_example=example,
-                skops_trusted_types=TRUSTED_TYPES,
-            )
+            log_model(result.estimator, example)
         results.append(replace(result, run_id=run.info.run_id))
     return results
 
 
+Targets = Annotated[list[str] | None, typer.Option(help="Target, repeatable (default: both)")]
+Source = Annotated[Path, typer.Option(help="Folder with the station-hour features and profiles")]
+TestStart = Annotated[str, typer.Option(help="YYYY-MM: first month of the test split")]
+Track = Annotated[bool, typer.Option(help="Log the runs to the MLflow server")]
+
+
 @app.command()
-def main(
+def fit(
     model: Annotated[
         list[str] | None, typer.Option(help="Model to train, repeatable (default: all models)")
     ] = None,
-    target: Annotated[
-        list[str] | None, typer.Option(help="Target, repeatable (default: both)")
-    ] = None,
-    src: Annotated[
-        Path, typer.Option(help="Folder with the station-hour features and profiles")
-    ] = FEATURES_DIR,
-    test_start: Annotated[
-        str, typer.Option(help="YYYY-MM: first month of the test split")
-    ] = TEST_START,
-    track: Annotated[bool, typer.Option(help="Log the runs to the MLflow server")] = True,
+    target: Targets = None,
+    src: Source = FEATURES_DIR,
+    test_start: TestStart = TEST_START,
+    track: Track = True,
 ):
+    """Train and score the models with their default params."""
     (train_tracked if track else train)(model or tuple(MODELS), target or TARGETS, src, test_start)
+
+
+@app.command()
+def tune(
+    model: Annotated[
+        list[str] | None, typer.Option(help="Model to tune, repeatable (default: the finalists)")
+    ] = None,
+    target: Targets = None,
+    src: Source = FEATURES_DIR,
+    test_start: TestStart = TEST_START,
+    n_trials: Annotated[
+        int | None, typer.Option(help="Random trials besides the defaults (default: 20)")
+    ] = None,
+    track: Track = True,
+):
+    """Search the hyperparameters inside the training split and refit the best ones."""
+    from team2_mlops2026.modeling import tuning  # tuning builds on this module
+
+    (tuning.tune_tracked if track else tuning.tune)(
+        model or tuning.FINALISTS, target or TARGETS, src, test_start, n_trials or tuning.N_TRIALS
+    )
 
 
 if __name__ == "__main__":
