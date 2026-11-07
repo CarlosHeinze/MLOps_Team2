@@ -319,3 +319,145 @@ def plot_maps(
     fig.suptitle(title, fontweight="bold")
     fig.tight_layout()
     return fig
+
+
+# --- hyperparameter search --------------------------------------------------------
+
+
+def _log_scaled(values: pd.Series) -> bool:
+    """Whether a param reads better on a log scale: its positive values span 10x or more."""
+    positive = values[values > 0]
+    return len(positive) > 1 and positive.max() / positive.min() >= 10
+
+
+def _axis_values(values: pd.Series) -> pd.Series:
+    """``values`` as drawn: log10 when ``_log_scaled``, with zeros at the smallest positive one."""
+    if not _log_scaled(values):
+        return values.astype("float64")
+    return np.log10(values.clip(lower=values[values > 0].min()))
+
+
+def plot_parallel_coordinates(
+    trials: pd.DataFrame, metric: str, title: str, highlight=None
+) -> plt.Figure:
+    """One vertical axis per column of ``trials`` (``metric`` last) and one line per trial,
+    darkest where ``metric`` is lowest, as in MLflow's parallel coordinates plot.
+
+    Each axis spans its own min to max, on a log scale when it covers 10x or more. The row
+    labelled ``highlight``, such as the defaults, is drawn dashed.
+    """
+    cols = [c for c in trials.columns if c != metric] + [metric]
+    scaled = {}
+    for col in cols:
+        values = _axis_values(trials[col])
+        span = values.max() - values.min()
+        scaled[col] = (values - values.min()) / span if span else values * 0 + 0.5
+    scaled = pd.DataFrame(scaled)
+    cmap = SEQUENTIAL.reversed()
+    norm = mpl.colors.Normalize(trials[metric].min(), trials[metric].max())
+    fig, ax = plt.subplots(figsize=(1.5 * len(cols) + 2, 4.5))
+    x = np.arange(len(cols))
+    # The best trials are drawn last, on top
+    for label in trials[metric].sort_values(ascending=False).index:
+        if label != highlight:
+            color = cmap(norm(trials.loc[label, metric]))
+            ax.plot(x, scaled.loc[label], color=color, linewidth=1.5)
+    if highlight is not None:
+        ax.plot(x, scaled.loc[highlight], color=INK, linestyle="--", linewidth=1.5)
+        ax.plot([], [], color=INK, linestyle="--", label=str(highlight))
+        ax.legend(loc="lower left", bbox_to_anchor=(0, 1.02), fontsize=8)
+    for i, col in enumerate(cols):
+        ax.axvline(i, color=AXIS, linewidth=1)
+        for y, value, va, dy in (
+            (1, trials[col].max(), "bottom", 4),
+            (0, trials[col].min(), "top", -4),
+        ):
+            ax.annotate(
+                f"{value:.3g}",
+                (i, y),
+                xytext=(0, dy),
+                textcoords="offset points",
+                ha="center",
+                va=va,
+                fontsize=8,
+                color=INK_SECONDARY,
+            )
+    labels = [f"{c}\n(log)" if _log_scaled(trials[c]) else c for c in cols]
+    ax.set_xticks(x, labels, fontsize=8)
+    ax.set(yticks=[], xlim=(-0.3, len(cols) - 0.7), ylim=(-0.12, 1.12))
+    ax.grid(False)
+    ax.spines["left"].set_visible(False)
+    fig.colorbar(mpl.cm.ScalarMappable(norm, cmap), ax=ax, label=metric, shrink=0.8)
+    ax.set_title(title, pad=24 if highlight is not None else 6)
+    fig.tight_layout()
+    return fig
+
+
+def plot_contour(
+    trials: pd.DataFrame, x: str, y: str, metric: str, title: str, highlight=None
+) -> plt.Figure:
+    """``metric`` interpolated over the params ``x`` and ``y`` of ``trials``, darkest where it
+    is lowest, as in MLflow's contour plot. Every trial is a point; ``highlight`` is a cross."""
+    xs, ys = _axis_values(trials[x]), _axis_values(trials[y])
+    fig, ax = plt.subplots(figsize=(6.5, 4.5))
+    filled = ax.tricontourf(xs, ys, trials[metric], levels=12, cmap=SEQUENTIAL.reversed())
+    ax.scatter(xs, ys, s=24, color=SURFACE, edgecolors=INK, linewidths=0.8, zorder=3)
+    if highlight is not None:
+        ax.scatter(
+            xs[highlight],
+            ys[highlight],
+            s=90,
+            marker="X",
+            color=INK,
+            label=str(highlight),
+            zorder=4,
+        )
+        ax.legend(fontsize=8)
+    ax.set(
+        title=title,
+        xlabel=f"{x} (log10)" if _log_scaled(trials[x]) else x,
+        ylabel=f"{y} (log10)" if _log_scaled(trials[y]) else y,
+    )
+    ax.grid(False)
+    fig.colorbar(filled, ax=ax, label=metric)
+    fig.tight_layout()
+    return fig
+
+
+def plot_param_effects(
+    trials: pd.DataFrame, metric: str, title: str, highlight=None, ncols: int = 4
+) -> plt.Figure:
+    """``metric`` against each param (every other column of ``trials``), one panel per param
+    on a shared y axis (log x when it spans 10x or more); ``highlight`` is a cross."""
+    params = [c for c in trials.columns if c != metric]
+    nrows = -(-len(params) // ncols)
+    fig, axes = plt.subplots(
+        nrows, ncols, figsize=(3.2 * ncols, 2.8 * nrows), sharey=True, squeeze=False
+    )
+    for ax, param in zip(axes.flat, params):
+        ax.scatter(trials[param], trials[metric], s=24, color=SERIES[0], linewidths=0)
+        if highlight is not None:
+            ax.scatter(
+                trials.loc[highlight, param],
+                trials.loc[highlight, metric],
+                s=70,
+                marker="X",
+                color=INK,
+                label=str(highlight),
+            )
+        values = trials[param]
+        if _log_scaled(values) and (values <= 0).any():  # a default of 0, such as no penalty
+            ax.set_xscale("symlog", linthresh=values[values > 0].min())
+        elif _log_scaled(values):
+            ax.set_xscale("log")
+        ax.xaxis.set_minor_formatter(mpl.ticker.NullFormatter())
+        ax.set_xlabel(param)
+    for ax in axes[:, 0]:
+        ax.set_ylabel(metric)
+    for ax in axes.flat[len(params) :]:
+        ax.axis("off")
+    if highlight is not None:
+        axes[0, 0].legend(fontsize=8)
+    fig.suptitle(title, fontweight="bold")
+    fig.tight_layout()
+    return fig

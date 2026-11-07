@@ -232,8 +232,44 @@ compares them. The choices:
   (the rolling mean of §9). At a quiet station single lagged hours are mostly 0 or 1. The level
   shows whether the station has been in use at all, and for a new station it is the first
   estimate of how busy it is.
-- **No early stopping yet:** scikit-learn's automatic early stopping validates on a random 10%
-  of the rows, which ignores time order. The tuning step validates on later hours instead.
+- **No early stopping in the defaults:** scikit-learn's automatic early stopping validates on a
+  random 10% of the rows, which ignores time order. The tuning step validates on later hours
+  instead.
+
+`team2_mlops2026/modeling/tuning.py` tunes the two finalists of `2.02`, `lgbm_tweedie` and
+`hgb_poisson`. It is run with `python -m team2_mlops2026.modeling.train tune`, and notebook `2.03`
+analyses the search. The choices:
+
+- **Validation inside the training split:** the search reads only the 12 months before the test
+  split (2024-10 to 2025-09). Each of its last three months (2025-07 to 2025-09) validates one
+  fold, and the fold trains on the window's hours before that month. The test months are never
+  read, so they remain an unbiased check for the backtest (`2.04`).
+- **Early stopping on later hours:** each fold stops on the 14 days just before its validation
+  month, after 20 iterations without improvement, never on a random sample of rows. The refit on
+  the whole training split uses no early stopping: it uses the mean number of iterations the
+  folds kept.
+- **Random search** (`ParameterSampler`), 20 trials per model and target, plus the defaults as
+  trial 0 on the same folds. It needs no new dependency. Each trial is independent, so it maps to
+  one nested MLflow run that can be compared in the UI. `HalvingRandomSearchCV` was left out for
+  two reasons: its resource is the number of rows, drawn at random, and it does not expose the
+  eliminated configurations as runs. Optuna would search more efficiently, but it would add a
+  dependency for a search of this size.
+- **Objective: Poisson deviance**, the mean over the three folds. It is the loss the count models
+  are trained for, and it scores every hour, quiet ones included. The overall and peak-hour WAPE
+  and the daily WAPE of demand group 1 are logged for every trial. `2.03` checks that the chosen
+  trial does not lose on them, since the success criterion is stated in WAPE.
+- **Compute budget:** a fold trains on a random third of its hours (0.8-1.0M rows) instead of all
+  of them. On the whole window one boosting fit took up to 2.5 minutes per fold, so a search of
+  21 configurations × 3 folds × 4 model-targets would have taken most of a day. Sampling keeps all
+  12 months of seasons, while a shorter window would drop some. The preprocessing has no tuned
+  params, so it is fitted once per fold and shared by all the trials.
+- **Known limitation:** the PCA loadings of the station profiles are fitted on the hours before
+  2025-10, so they include the validation months. The weekly scores only use trips from before
+  each week. The loadings summarise each station's hour-of-week shape over 33 months, and they
+  are the same for every trial, so they cannot favour one configuration over another.
+- **Outcome (`2.03`):** the tuned configurations lower the validation deviance by 1.3-1.5% for
+  every model and target, mostly by keeping more boosting iterations than the default 100. The two
+  finalists remain within 0.2% of each other, so both go to the backtest with their tuned params.
 
 ## 9. Features
 
