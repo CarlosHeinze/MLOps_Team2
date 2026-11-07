@@ -80,6 +80,25 @@ def git_commit() -> str:
     return result.stdout.strip()
 
 
+def latest_run(run_name: str):
+    """The latest finished run named ``run_name`` in the project's experiment, such as the
+    ``tune-<model>-<target>`` run whose model a later step loads."""
+    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+    runs = mlflow.search_runs(
+        experiment_names=[MLFLOW_EXPERIMENT_NAME],
+        filter_string=f"tags.mlflow.runName = '{run_name}' and status = 'FINISHED'",
+        order_by=["start_time DESC"],
+        max_results=1,
+        output_format="list",
+    )
+    if not runs:
+        raise LookupError(
+            f"No finished run named {run_name!r} in the MLflow experiment "
+            f"{MLFLOW_EXPERIMENT_NAME!r} at {MLFLOW_TRACKING_URI}"
+        )
+    return runs[0]
+
+
 def input_digests(run_id: str) -> dict[str, str]:
     """{name: digest} of the datasets a run logged."""
     inputs = mlflow.get_run(run_id).inputs.dataset_inputs

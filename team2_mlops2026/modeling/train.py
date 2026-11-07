@@ -14,11 +14,16 @@ data/processed/mibici/features/ -> one MLflow run per model and target
   and the fitted model.
 - ``tune`` searches the hyperparameters of the finalists inside the training split
   (``modeling.tuning``).
+- ``backtest`` refits the baselines and the tuned finalists on 12 monthly rolling-origin folds,
+  and ``ablation`` scores the finalists with and without the PCA profile scores
+  (``modeling.backtest``).
 
 Usage (CLI):
     python -m team2_mlops2026.modeling.train fit
     python -m team2_mlops2026.modeling.train fit --model lgbm_poisson --target departures --no-track
     python -m team2_mlops2026.modeling.train tune --model lgbm_tweedie --n-trials 20
+    python -m team2_mlops2026.modeling.train backtest --model seasonal_naive --n-folds 2
+    python -m team2_mlops2026.modeling.train ablation --model lgbm_tweedie
 
 Usage (notebook):
     from team2_mlops2026.modeling.train import load_training_data, train_tracked
@@ -49,7 +54,7 @@ from team2_mlops2026.features import (
     TIME,
     time_split,
 )
-from team2_mlops2026.modeling.evaluate import TEST_START, segment_report
+from team2_mlops2026.modeling.evaluate import N_FOLDS, TEST_START, segment_report
 from team2_mlops2026.modeling.models import MODELS, TRUSTED_TYPES
 from team2_mlops2026.station_profiles import FIT_END_KEY, PROFILES_FILE, WEEK, week_start
 
@@ -307,6 +312,53 @@ def tune(
 
     (tuning.tune_tracked if track else tuning.tune)(
         model or tuning.FINALISTS, target or TARGETS, src, test_start, n_trials or tuning.N_TRIALS
+    )
+
+
+Tuned = Annotated[
+    bool, typer.Option(help="Use the params of the latest tune runs for the finalists")
+]
+
+
+@app.command()
+def backtest(
+    model: Annotated[
+        list[str] | None,
+        typer.Option(help="Model to backtest, repeatable (default: baselines and finalists)"),
+    ] = None,
+    target: Targets = None,
+    src: Source = FEATURES_DIR,
+    first_test_month: Annotated[
+        str, typer.Option(help="YYYY-MM: test month of the first fold")
+    ] = (TEST_START),
+    n_folds: Annotated[int, typer.Option(help="Monthly folds")] = N_FOLDS,
+    tuned: Tuned = True,
+    track: Track = True,
+):
+    """Refit the models on rolling-origin monthly folds and score each test month."""
+    from team2_mlops2026.modeling import backtest as bt  # backtest builds on this module
+
+    (bt.backtest_tracked if track else bt.backtest)(
+        model or bt.BACKTEST_MODELS, target or TARGETS, src, first_test_month, n_folds, tuned
+    )
+
+
+@app.command()
+def ablation(
+    model: Annotated[
+        list[str] | None, typer.Option(help="Model to ablate, repeatable (default: the finalists)")
+    ] = None,
+    target: Targets = None,
+    src: Source = FEATURES_DIR,
+    test_start: TestStart = TEST_START,
+    tuned: Tuned = True,
+    track: Track = True,
+):
+    """Score the models with and without the PCA station profile scores on the test split."""
+    from team2_mlops2026.modeling import backtest as bt
+
+    (bt.ablation_tracked if track else bt.ablation)(
+        model or bt.FINALISTS, target or TARGETS, src, test_start, tuned
     )
 
 
