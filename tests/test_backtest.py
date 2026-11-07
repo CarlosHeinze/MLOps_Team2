@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import mlflow
 from mlflow.tracking import MlflowClient
 import numpy as np
@@ -23,11 +25,9 @@ N_FOLDS = 2
 NEW_SINCE = "2024-05"  # station 3 opens then
 
 
-@pytest.fixture
-def features_dir(tmp_path, monkeypatch):
+def write_features(tmp_path) -> Path:
     """Five months of random trips between stations 1 and 2, and from May 2024 a new station 3,
-    as features and weekly profiles fitted before ``FIRST_TEST_MONTH``."""
-    monkeypatch.setattr(bt, "NEW_SINCE", NEW_SINCE)
+    as features and weekly profiles fitted before ``FIRST_TEST_MONTH``. Returns their folder."""
     rng = np.random.default_rng(ft.SEED)
     hours = DAY0 + pd.to_timedelta(rng.integers(0, 152 * 24, 4000), unit="h")
     origins = rng.choice([1, 2], len(hours), p=[0.6, 0.4])
@@ -49,6 +49,12 @@ def features_dir(tmp_path, monkeypatch):
     ft.create_features(processed, interim, dst, start="2024-02")
     sp.create_profiles(dst, dst, fit_end=FIRST_TEST_MONTH, min_trips=1, score_min_trips=1)
     return dst
+
+
+@pytest.fixture
+def features_dir(tmp_path, monkeypatch):
+    monkeypatch.setattr(bt, "NEW_SINCE", NEW_SINCE)
+    return write_features(tmp_path)
 
 
 class LastHourSpy(RegressorMixin, BaseEstimator):

@@ -108,6 +108,49 @@ def test_time_split_puts_every_test_row_after_every_train_row(table):
     assert train[ft.TIME].max() < test[ft.TIME].min()
 
 
+# --- rows to forecast ----------------------------------------------------------
+
+
+def test_forecast_rows_rebuild_the_table_from_the_hours_before_start(trips):
+    table = ft.build_features(trips, STATIONS, DAY0)  # no trips before DAY0, so no warm-up
+    start = NEW_STATION_OPENS + pd.Timedelta(hours=36)  # station 3 is a day and a half old
+    rows = ft.forecast_rows(table, start)
+    day = table[(table[ft.TIME] >= start) & (table[ft.TIME] < start + pd.Timedelta(hours=24))]
+    expected = day.drop(columns=list(ft.TARGETS)).reset_index(drop=True)
+    pd.testing.assert_frame_equal(rows, expected)
+    assert rows.loc[rows[ft.STATION] == 3, "departures_lag_7d"].isna().all()
+    # The rows from start on are never read
+    before = table[table[ft.TIME] < start]
+    pd.testing.assert_frame_equal(ft.forecast_rows(before, start), rows)
+
+
+def test_forecast_rows_continue_after_the_last_hour(table):
+    end = table[ft.TIME].max()
+    rows = ft.forecast_rows(table)
+    assert rows[ft.TIME].min() == end + pd.Timedelta(hours=1)
+    assert rows[ft.TIME].max() == end + pd.Timedelta(hours=ft.FORECAST_HOURS)
+    assert len(rows) == 3 * ft.FORECAST_HOURS and set(rows[ft.STATION]) == {1, 2, 3}
+    assert not set(ft.TARGETS) & set(rows.columns)
+    eight = (end + pd.Timedelta(days=1)).normalize() + pd.Timedelta(hours=8)
+    assert at(rows, 1, eight)["departures_lag_2d"] == 1
+    assert at(rows, 1, eight)["departures_lag_7d"] == 1
+    # Station 2's last trip arrived at 08:10 of the last day: its later hours are known zeros
+    two_days = ft.forecast_rows(table, hours=ft.FORECAST_GAP)
+    assert at(two_days, 2, eight + pd.Timedelta(days=1, hours=2))["arrivals_lag_2d"] == 0
+
+
+def test_forecast_rows_skip_closed_stations_and_hours_without_lags(table):
+    closed = (table[ft.STATION] == 2) & (table[ft.TIME] >= DAY0 + pd.Timedelta(days=34))
+    rows = ft.forecast_rows(table[~closed], active_days=7)
+    assert set(rows[ft.STATION]) == {1, 3}
+    end = table[ft.TIME].max()
+    assert len(ft.forecast_rows(table, end + pd.Timedelta(hours=25)))  # lags up to the end
+    with pytest.raises(ValueError, match="needs the demand up to"):
+        ft.forecast_rows(table, end + pd.Timedelta(hours=26))
+    with pytest.raises(ValueError, match="needs the demand up to"):
+        ft.forecast_rows(table, hours=ft.FORECAST_GAP + 1)
+
+
 # --- preprocessing -------------------------------------------------------------
 
 
