@@ -34,9 +34,14 @@ reads only the previous step's output, so any step can be re-run on its own.
 | 4. Exploratory analysis | — | Findings for features and modelling | `1.03` |
 | 5. Features and preprocessing | `team2_mlops2026.features` | `data/processed/mibici/features/station_hour_features.parquet` | `1.04` |
 | 6. Station profiles (PCA) | `team2_mlops2026.station_profiles` | `data/processed/mibici/features/station_profiles.parquet` | `1.05` |
+| 7. Baselines and candidates | `team2_mlops2026.modeling.train fit` | MLflow runs `train-<model>-<target>`, each with its fitted model | `2.01`, `2.02` |
+| 8. Hyperparameter tuning | `team2_mlops2026.modeling.train tune` | `tune-<model>-<target>`: one nested run per trial, and the best params refitted on the training split | `2.03` |
+| 9. Backtest and PCA ablation | `team2_mlops2026.modeling.train backtest` and `... ablation` | `backtest-<model>` with one nested run per monthly fold; `ablation-<model>-<target>-pca` / `-no-pca` | `2.04` |
+| 10. Model Registry | `team2_mlops2026.modeling.registry` | `mibici-departures` and `mibici-arrivals`, aliases `champion` and `challenger` | `2.05` |
+| 11. Batch forecast | `team2_mlops2026.modeling.predict` | `data/processed/mibici/predictions/forecast_<YYYYMMDD_HH>h.parquet` and a `predict-<start>` run | `2.05` |
 
 Every step except the exploratory analysis is tracked in MLflow (see
-[Data versioning](#data-versioning)).
+[Data versioning](#data-versioning) and [MLflow](#mlflow-comparing-runs-and-the-model-registry)).
 
 ## How to run
 
@@ -119,15 +124,60 @@ These are the times and output sizes for the full history (39.1M raw trips), mea
 | Features | ~20 s | 78 MB |
 | Station profiles | ~7 s | 105 KB |
 
-### 4. Notebooks
+### 4. Modelling pipeline
 
-Run them in order: `0.01` → `1.01` → `1.02` → `1.03` → `1.04` → `1.05`.
+With `data/processed` present (step 3), `make pipeline` runs every modelling step in order
+against the MLflow server: `features` → `train` → `tune` → `evaluate` → `register` →
+`predict`. Each one is also a target of its own:
+
+```bash
+make features   # feature table and station profiles
+make train      # baselines and candidates with their default params (2.01, 2.02)
+make tune       # random search of the finalists' hyperparameters (2.03)
+make evaluate   # 12-fold rolling-origin backtest, then the PCA ablation (2.04)
+make register   # champion and challenger of each target in the Model Registry (2.05)
+make predict    # forecast of the 24 h after the last data (2.05)
+```
+
+The long steps run for hours. On macOS, keep the machine awake with `caffeinate -i make
+pipeline` (or `caffeinate -i make evaluate`): a laptop that sleeps stops the run halfway.
+A remote VM avoids the problem altogether.
+
+Useful options of the modelling CLIs (`--help` lists them all):
+
+| Option | Steps | Effect |
+|---|---|---|
+| `--model NAME` | train, tune, backtest, ablation | Only that model, repeatable (names in `modeling/models.py`) |
+| `--target departures` | train, tune, backtest, ablation, registry | Only that target |
+| `--n-trials N` | tune | Random trials besides the defaults (default `20`) |
+| `--n-folds N` | backtest | Monthly folds (default `12`, from `2025-10`) |
+| `--no-tuned` | backtest, ablation | Use the catalog defaults instead of the latest tune run |
+| `--champion NAME` | registry | Promote that finalist instead of the backtest's first |
+| `--start "YYYY-MM-DD HH:00"` | predict | Replay the forecast of a past day (default: the hour after the data) |
+
+Times on a 2019 MacBook Pro (8-core i9, 64 GB):
+
+| Step | Time |
+|---|---|
+| `make train` | ~10 min (14 runs) |
+| `make tune` | ~75 min (2 finalists × 2 targets × 21 trials, plus the refits) |
+| `make evaluate` | ~3 h 10 min (backtest of 4 models × 12 folds ~3 h, ablation ~13 min) |
+| `make register` | < 1 min |
+| `make predict` | ~10 s |
+
+### 5. Notebooks
+
+Run them in order: `0.01` → `1.01` → `1.02` → `1.03` → `1.04` → `1.05` → `2.01` → `2.02` →
+`2.03` → `2.04` → `2.05`.
 - `0.01`, `1.01`, `1.02`, `1.04` and `1.05` each run their pipeline step, skipping files that
   are already up to date, and validate its output.
 - `1.03` only reads `data/processed`. It first checks that data against the cleaning contract,
   so it stops if the data is stale.
+- `2.01` (baselines) and `2.02` (candidates) train their models with tracking. `2.03`, `2.04`
+  and `2.05` read the runs of `make tune` and `make evaluate`, and `2.05` registers the
+  champions and runs the batch forecast.
 
-### 5. Tests and lint
+### 6. Tests and lint
 
 ```bash
 make test    # pytest: unit tests on small synthetic data, no historical dataset needed
@@ -154,12 +204,42 @@ make lint    # ruff format --check + ruff check
   | `mibici_stations` | `normalize-raw-data` | `clean-interim-trips`, `build-station-hour-features` |
   | `mibici_trips_processed` | `clean-interim-trips` | `build-station-hour-features` |
   | `mibici_station_hour_features` | `build-station-hour-features` | `fit-station-profiles` |
-  | `mibici_station_profiles` | `fit-station-profiles` | models (phase 2) |
+  | `mibici_station_profiles` | `fit-station-profiles` | `train-*`, `tune-*`, `backtest-*`, `ablation-*`, `predict-*` |
+  | `mibici_predictions` | `predict-<start>` | the rebalancing plan |
+
+  The model runs also read `mibici_station_hour_features`. A registered model version records
+  the digests of the tables its source run read (`features_digest` and `profiles_digest`).
 
   The steps are deterministic: re-running one with the same code on the same input
   reproduces the same output digest, so a new digest always means the data or the code changed.
 - **Changes to the data:** `data/processed/mibici/cleaning_report.json` lists, for every month,
   the rows and values each cleaning rule touched.
+
+## MLflow: comparing runs and the Model Registry
+
+Open the UI at http://127.0.0.1:5001 (with `make mlflow` running) and the `mibici` experiment.
+The server and its database are local. To share them with the team, forward port 5001 from
+VS Code (Ports tab) or run the server on a shared VM.
+
+- **Compare models:** filter the runs with `attributes.run_name LIKE 'train-%'`, group them
+  by the tag `model_family`, select them and press *Compare*. A bar chart of `peak_wape` or
+  `overall_wape` across the runs reproduces the comparison of `2.02`.
+- **Tuning:** open a `tune-<model>-<target>` run. Its nested runs (`defaults`, `trial-01`...)
+  are the trials. Select them, *Compare*, and add a *Parallel Coordinates* chart with the
+  searched params and `val_overall_poisson_deviance`.
+- **Backtest:** each `backtest-<model>` run logs the key metrics of every fold as steps
+  (`fold_departures_peak_wape`, ...): its *Model metrics* tab draws them per fold. The
+  nested `fold-<month>` runs hold the full metrics of each month, and the parent run the mean
+  and std (`departures_peak_wape`, `departures_peak_wape_std`) plus the figures under
+  `backtest/`.
+- **PCA ablation:** filter with `tags.experiment = 'pca_ablation'` and compare the `-pca` and
+  `-no-pca` runs of each model and target.
+- **Model Registry:** the *Models* tab lists `mibici-departures` and `mibici-arrivals`. Each
+  version links to its source run and carries a description and tags: algorithm, training
+  window, test and backtest metrics, success criterion, input digests and git commit. The
+  alias `champion` marks the version that `predict` loads (`models:/mibici-<target>@champion`),
+  and `challenger` the one kept for comparison. Promoting another version only moves the
+  alias.
 
 ## Project Organization
 
@@ -169,17 +249,23 @@ make lint    # ruff format --check + ruff check
 ├── data               <- Git-ignored; rebuilt by the pipeline
 │   ├── raw            <- MiBici CSVs exactly as published, plus manifest.json
 │   ├── interim        <- Typed Parquet, one schema for every month
-│   └── processed      <- Cleaned trips, cleaning_report.json, feature table and station profiles
+│   └── processed      <- Cleaned trips, cleaning_report.json, feature table, station profiles
+│                         and forecasts
 │
 ├── docs               <- Default mkdocs project (not used yet)
-├── models             <- Trained models (phase 2)
+├── models             <- Not used: the models are logged to MLflow and served by its Registry
 ├── notebooks          <- PHASE.NOTEBOOK-team2-description, run in order
 │   ├── 0.01-team2-initial-data-exploration.ipynb
 │   ├── 1.01-team2-data-format-normalization.ipynb
 │   ├── 1.02-team2-data-cleaning.ipynb
 │   ├── 1.03-team2-exploratory-data-analysis.ipynb
 │   ├── 1.04-team2-preprocessing.ipynb
-│   └── 1.05-team2-station-profiles-pca.ipynb
+│   ├── 1.05-team2-station-profiles-pca.ipynb
+│   ├── 2.01-team2-baselines.ipynb
+│   ├── 2.02-team2-model-comparison.ipynb
+│   ├── 2.03-team2-hyperparameter-tuning.ipynb
+│   ├── 2.04-team2-model-evaluation.ipynb
+│   └── 2.05-team2-model-registry.ipynb
 │
 ├── pyproject.toml     <- Package metadata and ruff configuration
 ├── references         <- ml-canvas.md: requirements analysis and value proposition
@@ -200,6 +286,12 @@ make lint    # ruff format --check + ruff check
     ├── station_profiles.py  <- Step 6: station usage profiles reduced with PCA
     ├── plots.py       <- Charts used by the notebooks
     ├── tracking.py    <- MLflow helpers: runs and dataset logging with digests
-    ├── dataset.py     <- Legacy Cookiecutter placeholder; `make data` uses the real modules
-    └── modeling       <- Cookiecutter placeholders for training and prediction (phase 2)
+    └── modeling
+        ├── models.py    <- Catalog of baselines and candidates, with their search spaces
+        ├── evaluate.py  <- Metrics, segments, success criterion and rolling-origin folds
+        ├── train.py     <- Step 7 and the CLI of steps 8-9: fit, tune, backtest, ablation
+        ├── tuning.py    <- Step 8: random search with time-based validation
+        ├── backtest.py  <- Step 9: rolling-origin backtest and PCA ablation
+        ├── registry.py  <- Step 10: champion and challenger in the Model Registry
+        └── predict.py   <- Step 11: batch forecast with the registered champions
 ```

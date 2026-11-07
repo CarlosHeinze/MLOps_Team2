@@ -75,6 +75,55 @@ data:
 	$(PYTHON_INTERPRETER) -m team2_mlops2026.data.interim_data_cleaning
 
 
+## Build the station-hour features and the PCA station profiles from data/processed
+.PHONY: features
+features:
+	$(PYTHON_INTERPRETER) -m team2_mlops2026.features
+	$(PYTHON_INTERPRETER) -m team2_mlops2026.station_profiles
+
+
+## Train and score the baselines and candidates with their default params
+.PHONY: train
+train:
+	$(PYTHON_INTERPRETER) -m team2_mlops2026.modeling.train fit
+
+
+## Tune the finalists' hyperparameters inside the training split
+.PHONY: tune
+tune:
+	$(PYTHON_INTERPRETER) -m team2_mlops2026.modeling.train tune
+
+
+## Rolling-origin backtest and PCA ablation of the baselines and tuned finalists
+.PHONY: evaluate
+evaluate:
+	$(PYTHON_INTERPRETER) -m team2_mlops2026.modeling.train backtest
+	$(PYTHON_INTERPRETER) -m team2_mlops2026.modeling.train ablation
+
+
+## Register the champion and challenger of each target in the MLflow Model Registry
+.PHONY: register
+register:
+	$(PYTHON_INTERPRETER) -m team2_mlops2026.modeling.registry
+
+
+## Forecast the next 24 h of every active station with the registered champions
+.PHONY: predict
+predict:
+	$(PYTHON_INTERPRETER) -m team2_mlops2026.modeling.predict
+
+
+## Every step after the data, in order: features, train, tune, evaluate, register, predict
+.PHONY: pipeline
+pipeline:
+	$(MAKE) features
+	$(MAKE) train
+	$(MAKE) tune
+	$(MAKE) evaluate
+	$(MAKE) register
+	$(MAKE) predict
+
+
 #################################################################################
 # Self Documenting Commands                                                     #
 #################################################################################
