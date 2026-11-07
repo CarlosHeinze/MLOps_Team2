@@ -19,6 +19,8 @@ how its columns are transformed before modelling:
   target encoding for the ~480 station ids, imputation + scaling for the station attributes and
   for the PCA profile scores when they are joined. It is fitted on the training split only
   (``time_split``), so no test statistic leaks in.
+- ``forecast_rows``: the same columns, without targets, for the hours after the last data (the
+  batch forecast of ``modeling.predict``), from the history before them only.
 
 Usage (CLI):
     python -m team2_mlops2026.features
@@ -76,6 +78,8 @@ LAGS = {"lag_2d": FORECAST_GAP, "lag_7d": 168}
 SAME_HOUR_WEEKS = 4  # mean of the same hour of the week over the previous 4 weeks
 MEAN_HOURS = 168  # mean_7d: mean hourly demand over the 7 days that end FORECAST_GAP back
 WARMUP_HOURS = SAME_HOUR_WEEKS * 168  # history needed before ``start`` for every lag
+FORECAST_HOURS = 24  # the batch forecast covers the next day
+ACTIVE_DAYS = 28  # a station without a trip in the last four weeks gets no forecast
 
 DEMAND_FEATURES = tuple(
     f"{target}_{name}" for target in TARGETS for name in [*LAGS, "same_hour_4w", "mean_7d"]
@@ -235,6 +239,70 @@ def time_split(
     """Train before ``test_start``, test from it on: a random split would leak future demand."""
     is_test = features[TIME] >= pd.Timestamp(test_start)
     return features[~is_test], features[is_test]
+
+
+# --- rows to forecast ----------------------------------------------------------
+
+
+def forecast_rows(
+    history: pd.DataFrame,
+    start: str | pd.Timestamp | None = None,
+    hours: int = FORECAST_HOURS,
+    active_days: int = ACTIVE_DAYS,
+) -> pd.DataFrame:
+    """Feature rows of the ``hours`` hours from ``start``: the table's columns without the
+    targets, built only from the rows of ``history`` (the station-hour table) before ``start``.
+
+    - ``start`` defaults to the hour after the last one in ``history``. A past ``start``
+      replays the forecast made then, since the later rows are ignored.
+    - Every lag is at least ``FORECAST_GAP`` hours back, so the forecast reaches up to
+      ``FORECAST_GAP`` hours after the last known hour; a longer one is rejected.
+    - The stations are those with a trip in the ``active_days`` days before ``start``.
+    - Inside a station's history an hour without a row is a known zero, since the table ends
+      each station at its last trip. Hours before its first row are unknown, as in
+      ``build_features``. ``history`` needs the ``WARMUP_HOURS`` before ``start``.
+    """
+    start = history[TIME].max() + pd.Timedelta(hours=1) if start is None else pd.Timestamp(start)
+    first_hour = start - pd.Timedelta(hours=WARMUP_HOURS)
+    before = history[history[TIME] < start]
+    past = before[before[TIME] >= first_hour]
+    if past.empty:
+        raise ValueError(f"No history in the {WARMUP_HOURS} hours before {start}")
+    last_known = past[TIME].max()
+    needed = start + pd.Timedelta(hours=hours - 1 - FORECAST_GAP)
+    if needed > last_known:
+        raise ValueError(
+            f"A forecast of {hours} h from {start} needs the demand up to {needed}, but the "
+            f"history ends at {last_known}"
+        )
+
+    recent = before[before[TIME] >= start - pd.Timedelta(days=active_days)]
+    trips = recent[list(TARGETS)].sum(axis=1).groupby(recent[STATION]).sum()
+    stations = trips.index[trips > 0].to_numpy()
+    past = past[past[STATION].isin(stations)]
+    rows = pd.Index(stations).get_indexer(past[STATION])
+    cols = _hour_index(past[TIME], first_hour)
+    first = pd.Series(cols).groupby(rows).min().reindex(range(len(stations))).to_numpy()
+    hour = np.arange(WARMUP_HOURS + hours)
+    last_col = (last_known - first_hour) // pd.Timedelta(hours=1)
+    known = (hour >= first[:, None]) & (hour <= last_col)
+
+    times = pd.date_range(start, periods=hours, freq="h")
+    columns = {
+        STATION: np.repeat(stations, hours),
+        TIME: np.tile(times.to_numpy().astype(history[TIME].dtype), len(stations)),
+    }
+    for target in TARGETS:
+        counts = np.zeros(known.shape, np.float32)
+        counts[rows, cols] = past[target].to_numpy()
+        for name, values in lag_features(counts, known).items():
+            columns[f"{target}_{name}"] = values[:, -hours:].ravel()
+    for name, values in calendar_features(times).items():
+        columns[name] = np.tile(values, len(stations))
+    attrs = past.groupby(STATION)[list(STATION_ATTRS)].last().reindex(stations)
+    for name in STATION_ATTRS:
+        columns[name] = np.repeat(attrs[name].to_numpy(), hours)
+    return pd.DataFrame(columns, columns=[c for c in FEATURE_COLUMNS if c not in TARGETS])
 
 
 # --- preprocessing -------------------------------------------------------------
