@@ -35,11 +35,11 @@ The data shows the imbalance is large and structural:
 | **Value proposition** | Tell MiBici's rebalancing team, a day ahead, which stations will run out of bikes or docks and when, so trucks go where they are needed before the peaks. |
 | **Prediction task** | Hourly departures and arrivals per station for the next 24 h; net flow follows from them. Multi-series count forecasting. |
 | **Decisions** | Nightly and midday rebalancing plan: which stations to restock or empty, by how many bikes, and in what order. |
-| **Impact simulation** | Rolling-origin backtest over the last 12 months against seasonal-naive and historical-average baselines (MAE, WAPE, Poisson deviance), plus how well it flags high-imbalance station-days. |
+| **Impact simulation** | Rolling-origin backtest over the last 12 months against seasonal-naive and historical-average baselines (MAE, WAPE, Poisson deviance), plus how well it flags high-imbalance station-days. **Measured (`2.04`):** the champion's peak-hour WAPE is 15.4% (departures) and 15.1% (arrivals) below the best baseline, with no demand group worse: the success criterion is met. |
 | **Making predictions** | Batch, nightly at about 23:00 for the next day (~480 stations × 24 h ≈ 11.5k values), with an optional midday refresh. Runs in seconds. |
 | **Data collection** | Each month MiBici publishes a new CSV; the pipeline ingests, normalizes, validates and cleans it, and MLflow logs every dataset version. Labels arrive for free: next month's trips are the ground truth. |
 | **Data sources** | MiBici open data: 142 monthly trip files (39.1M raw trips) and the current station nomenclature. Candidates: weather, public holidays and the school calendar. |
-| **Building models** | Retrain monthly on station-hour counts with a time-based split. Baselines first, then gradient boosting with a Poisson or Tweedie objective. Tracked in MLflow. |
+| **Building models** | Retrain monthly on station-hour counts with a time-based split. Baselines first, then gradient boosting with a Poisson or Tweedie objective. Tracked in MLflow. **Selected:** LightGBM with a Tweedie objective (`lgbm_tweedie`) for both targets, registered as `champion` in the MLflow Model Registry, with `hgb_poisson` as `challenger`. |
 | **Features** | Station (id, location, capacity, usage cluster), hour × weekday with cyclical encoding, month and holidays, lagged and rolling demand, and trend. |
 | **Monitoring** | Contract validation of every new month; drift in volume, hourly profile and station ids; forecast error per month and per station against the baseline. |
 
@@ -100,9 +100,9 @@ the time windows (overnight and midday).
 - **Decision metric:** precision and recall in flagging *high-imbalance station-days*, defined
   as days where a station's absolute net flow exceeds half of its capacity. This approximates
   the decision in block 3 without inventory data.
-- **Success criterion (proposed):** at least 10% lower WAPE than the best baseline at peak
-  hours, with no station group (for example, low-demand peripheral stations) worse than the
-  baseline.
+- **Success criterion (fixed before training):** at least 10% lower WAPE than the best baseline
+  at peak hours, with no station group (for example, low-demand peripheral stations) worse than
+  the baseline.
 
 `team2_mlops2026/modeling/evaluate.py` implements this protocol. It makes these choices:
 
@@ -146,6 +146,31 @@ forecast, so both baselines fall back to a simpler rule where their own rule has
   A station with no training hours at that weekday and hour gets the mean of all stations at
   that weekday and hour.
 
+**Measured results (`2.04`, 12 monthly folds from 2025-10 to 2026-09, mean ± std):**
+
+| Model | Peak WAPE departures | Peak WAPE arrivals | Group 1 daily WAPE (departures) | Imbalance precision / recall | Criterion |
+|---|---|---|---|---|---|
+| seasonal naive | 0.653 ± 0.057 | 0.603 ± 0.052 | 0.444 | 0.48 / 0.48 | — |
+| historical average (best baseline) | 0.614 ± 0.081 | 0.569 ± 0.079 | 0.474 | 0.57 / 0.45 | — |
+| **`lgbm_tweedie` (champion)** | **0.520 ± 0.042** | **0.483 ± 0.039** | 0.334 | 0.69 / 0.43 | passed: −15.4% / −15.1% |
+| `hgb_poisson` (challenger) | 0.521 ± 0.043 | 0.488 ± 0.038 | 0.335 | 0.68 / 0.44 | passed: −15.2% / −14.4% |
+
+- **Month by month** the champion passes in 11 of 12 months for departures and 10 of 12 for
+  arrivals. In September 2026 (record demand) and October 2025 (arrivals) its margin falls to
+  8.0-9.6%: still better than the baseline, but below the bar. December and June are the hardest
+  months for every model.
+- **Unseen stations:** the ~100 stations opened since May 2026 go from a daily WAPE of 0.77 in
+  their first month to 0.30 in September. The baselines start at about 2.
+- **Decision metric:** the champion is more precise than any baseline (7 of 10 flagged
+  station-days are real) but catches 43% of them. A lower alert threshold, for example 40% of the
+  capacity, would raise the recall without changing the model.
+- **PCA ablation** (`ablation-*` runs, Phase 1 review): without the profile scores the peak-hour
+  WAPE rises 0.2-0.6% and the deviance 0.2-0.3% for both finalists and targets. PCA helps
+  consistently, but marginally.
+- **Replayed night** (`2.05`, the forecast for 9 September 2026 loaded from the Registry):
+  peak-hour WAPE 0.46 (departures) and 0.42 (arrivals), the system total 3.6% low, and a
+  precision of 0.86 on the high-imbalance stations.
+
 ## 5. Making predictions
 
 - **When:** a batch job every night at about 23:00 for the next day, with an optional refresh
@@ -157,6 +182,10 @@ forecast, so both baselines fall back to a simpler rule where their own rule has
 - **Requirement for a real deployment:** live bike counts per station from the operator. The
   open data publishes monthly with a delay, so in this project predictions are simulated on
   historical months.
+- **Implementation:** `python -m team2_mlops2026.modeling.predict` (`make predict`) loads
+  `models:/mibici-<target>@champion` from the Model Registry and forecasts the 24 hours after the
+  last data for every station with a trip in the last 28 days. For 1 October 2026 it wrote
+  11,232 forecasts (468 stations × 24 h) in about 10 seconds.
 
 ## 6. Data collection
 
@@ -270,6 +299,21 @@ analyses the search. The choices:
 - **Outcome (`2.03`):** the tuned configurations lower the validation deviance by 1.3-1.5% for
   every model and target, mostly by keeping more boosting iterations than the default 100. The two
   finalists remain within 0.2% of each other, so both go to the backtest with their tuned params.
+
+**Selected model (`2.04`, `2.05`).** The 12-fold backtest (§4) ranks the finalists: first the
+success criterion on the mean of the folds, then the peak-hour WAPE.
+
+- **Champion:** `lgbm_tweedie` for both targets. It is within 0.005 of `hgb_poisson` on the mean,
+  so it wins on consistency: it passes the criterion in more months (10 of 12 for arrivals, against
+  7), refits the 12 folds in 73 minutes against 96, and overshoots less in the night hours.
+- **Model Registry:** `team2_mlops2026/modeling/registry.py` registers the model of each
+  finalist's `tune-<model>-<target>` run as `mibici-departures` and `mibici-arrivals`. The champion
+  holds the `champion` alias (v1), and the runner-up holds `challenger` (v2). Each version carries
+  a description and tags: algorithm, training window, test-split and backtest metrics, the
+  success criterion, the input digests and the git commit.
+- **Retraining:** `make train tune evaluate register` on each new month. The `champion` alias only
+  moves to a model that passes the criterion in the backtest, and the previous version stays in the
+  Registry for a rollback.
 
 ## 9. Features
 
