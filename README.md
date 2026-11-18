@@ -39,6 +39,8 @@ reads only the previous step's output, so any step can be re-run on its own.
 | 9. Backtest and PCA ablation | `team2_mlops2026.modeling.train backtest` and `... ablation` | `backtest-<model>` with one nested run per monthly fold; `ablation-<model>-<target>-pca` / `-no-pca` | `2.04` |
 | 10. Model Registry | `team2_mlops2026.modeling.registry` | `mibici-departures` and `mibici-arrivals`, aliases `champion` and `challenger` | `2.05` |
 | 11. Batch forecast | `team2_mlops2026.modeling.predict` | `data/processed/mibici/predictions/forecast_<YYYYMMDD_HH>h.parquet` and a `predict-<start>` run | `2.05` |
+| 12. Model export | `team2_mlops2026.modeling.export` | `models/mibici-<target>/`: each champion as registered, plus `models/model_card.json` | `3.01` |
+| 13. Online serving | `team2_mlops2026.serving.app` (FastAPI) | `POST /predict`, `GET /health` and `GET /model` on port 8000; schema in `docs/api/` | `3.01` |
 
 Every step except the exploratory analysis is tracked in MLflow (see
 [Data versioning](#data-versioning) and [MLflow](#mlflow-comparing-runs-and-the-model-registry)).
@@ -165,10 +167,84 @@ Times on a 2019 MacBook Pro (8-core i9, 64 GB):
 | `make register` | < 1 min |
 | `make predict` | ~10 s |
 
-### 5. Notebooks
+### 5. Serving the champions (FastAPI)
+
+The service forecasts online with the same models and the same numbers as the batch forecast.
+It loads the champions from `models/`, so once they are exported it needs no MLflow server:
+
+```bash
+make export     # models:/mibici-<target>@champion -> models/ (needs the MLflow server)
+make serve      # http://127.0.0.1:8000, Swagger UI at http://127.0.0.1:8000/docs
+```
+
+Served models (alias `champion`, exported on 2026-11-18):
+
+| Target | Model URI | Registered model | Version | Algorithm |
+|---|---|---|---|---|
+| departures | `models:/mibici-departures/1` | `mibici-departures` | 1 | `lgbm_tweedie` (LGBMRegressor) |
+| arrivals | `models:/mibici-arrivals/1` | `mibici-arrivals` | 1 | `lgbm_tweedie` (LGBMRegressor) |
+
+`make export` resolves the alias once and downloads that pinned version. It also writes
+`models/model_card.json`: version, source run, test and backtest metrics, input digests and git
+commit of each model, as tagged in the Registry. `GET /model` returns that card.
+
+| Endpoint | Returns |
+|---|---|
+| `POST /predict` | Expected departures, arrivals and net flow (arrivals - departures) per row, and the model version of each target |
+| `GET /health` | 200 with the models loaded, 503 without them (for the container's health check) |
+| `GET /model` | The model card |
+| `GET /docs`, `GET /openapi.json` | Swagger UI and the OpenAPI schema ([docs/api/openapi.json](docs/api/openapi.json)) |
+
+The request carries one feature row per station-hour: the columns of `features.forecast_rows`
+(lags, weekday, cyclical hour and month, station attributes) and, optionally, the profile
+scores `pc1`-`pc5`. `null` marks an unknown value, as NaN does in the feature table. Example
+with three stations at the morning peak of 9 Sep 2026, the night replayed in notebook `2.05`:
+
+```bash
+curl -s -X POST http://127.0.0.1:8000/predict \
+  -H "Content-Type: application/json" \
+  -d @docs/api/example_request.json
+```
+
+The response ([docs/api/example_response.json](docs/api/example_response.json)), shortened:
+
+```json
+{
+  "predictions": [
+    {"station_id": 51, "hour_start": "2026-09-09T08:00:00", "departures": 46.84400274438855,
+     "arrivals": 14.689625404127986, "net_flow": -32.15437734026056},
+    ...
+  ],
+  "models": {
+    "departures": {"name": "mibici-departures", "version": "1", "alias": "champion",
+                   "uri": "models:/mibici-departures/1"},
+    ...
+  }
+}
+```
+
+| Status | When |
+|---|---|
+| 422 | A row breaks the data contract: a field out of bounds, missing or unknown, an hour with a time zone or minutes, a weekday of another day. The body names the field and the reason |
+| 400 | An empty batch or more than 25,000 rows (a whole night is ~11,200) |
+| 503 | The models are not loaded: run `make export`, then restart |
+| 500 | The forecast failed; the details stay in the service log |
+
+| Setting | Default | Effect |
+|---|---|---|
+| `MODEL_SOURCE` | `local` | `local`: the exported folder. `registry`: `models:/mibici-<target>@<MODEL_ALIAS>` from the MLflow server in `MLFLOW_TRACKING_URI` |
+| `MODEL_DIR` | `models/` | Folder that `make export` wrote |
+| `MODEL_ALIAS` | `champion` | Alias served with `MODEL_SOURCE=registry` |
+| `SERVE_HOST`, `SERVE_PORT` | `127.0.0.1`, `8000` | Address of `make serve` (`make serve SERVE_PORT=8080`) |
+
+Notebook `3.01` sends the 11,208 rows of 9 Sep 2026 to the service and compares them with the
+batch forecast: the largest difference is 0. After a change to the schemas or the app,
+`make api-docs` regenerates `docs/api/`; a test fails while it is out of date.
+
+### 6. Notebooks
 
 Run them in order: `0.01` → `1.01` → `1.02` → `1.03` → `1.04` → `1.05` → `2.01` → `2.02` →
-`2.03` → `2.04` → `2.05`.
+`2.03` → `2.04` → `2.05` → `3.01`.
 - `0.01`, `1.01`, `1.02`, `1.04` and `1.05` each run their pipeline step, skipping files that
   are already up to date, and validate its output.
 - `1.03` only reads `data/processed`. It first checks that data against the cleaning contract,
@@ -176,8 +252,10 @@ Run them in order: `0.01` → `1.01` → `1.02` → `1.03` → `1.04` → `1.05`
 - `2.01` (baselines) and `2.02` (candidates) train their models with tracking. `2.03`, `2.04`
   and `2.05` read the runs of `make tune` and `make evaluate`, and `2.05` registers the
   champions and runs the batch forecast.
+- `3.01` needs `make mlflow` and `make serve` running: it sends a night of rows to the service
+  and compares the answer with the batch forecast.
 
-### 6. Tests and lint
+### 7. Tests and lint
 
 One command from the project root runs the whole suite:
 
@@ -199,7 +277,10 @@ make lint                        # ruff format --check + ruff check
 - **Unit tests:** one module per source module (`tests/test_<module>.py`). They cover the
   rules of each step on hand-made data: the cleaning contract, the lags and the preprocessing
   (`test_features`), the metrics and the success criterion (`test_evaluate`), the forecast and
-  the profile join (`test_predict`), and the tracked runs, the Registry and the lineage.
+  the profile join (`test_predict`), the tracked runs, the Registry and the lineage, and the
+  export of the champions (`test_export`). `test_serving` calls the API with `TestClient` on
+  small synthetic models: the forecasts equal `predict.forecast`, invalid rows get 422, an
+  empty or oversized batch 400, and the service without models 503.
 - **Integration test:** `tests/test_pipeline_integration.py`, marked `integration`. It runs
   the pipeline end to end on three months of synthetic commutes: raw CSVs → normalization →
   cleaning → features → station profiles → training of a baseline and a small LightGBM →
@@ -209,8 +290,8 @@ make lint                        # ruff format --check + ruff check
 
 | Command | Tests | Time |
 |---|---|---|
-| `pytest -q` | 256 | ~2 min |
-| `pytest -q -m "not integration"` | 255 | ~2 min |
+| `pytest -q` | 280 | ~2 min |
+| `pytest -q -m "not integration"` | 279 | ~2 min |
 | `pytest -q -m integration` | 1 | ~15 s |
 
 Times on a Windows laptop (Ryzen 7 4800H, 16 GB). Most of the time goes to the tests that log
@@ -276,7 +357,7 @@ VS Code (Ports tab) or run the server on a shared VM.
 ## Project Organization
 
 ```
-├── Makefile           <- environment, local MLflow, pipeline, tests, lint
+├── Makefile           <- environment, local MLflow, pipeline, export and serving, tests, lint
 ├── README.md
 ├── data               <- Git-ignored; rebuilt by the pipeline
 │   ├── raw            <- MiBici CSVs exactly as published, plus manifest.json
@@ -284,8 +365,10 @@ VS Code (Ports tab) or run the server on a shared VM.
 │   └── processed      <- Cleaned trips, cleaning_report.json, feature table, station profiles
 │                         and forecasts
 │
-├── docs               <- Default mkdocs project (not used yet)
-├── models             <- Not used: the models are logged to MLflow and served by its Registry
+├── docs
+│   └── api            <- OpenAPI schema and an example request and response (make api-docs)
+├── models             <- Git-ignored; the champions exported for serving, plus model_card.json
+│                         (make export). The versions live in the MLflow Model Registry
 ├── notebooks          <- PHASE.NOTEBOOK-team2-description, run in order
 │   ├── 0.01-team2-initial-data-exploration.ipynb
 │   ├── 1.01-team2-data-format-normalization.ipynb
@@ -297,7 +380,8 @@ VS Code (Ports tab) or run the server on a shared VM.
 │   ├── 2.02-team2-model-comparison.ipynb
 │   ├── 2.03-team2-hyperparameter-tuning.ipynb
 │   ├── 2.04-team2-model-evaluation.ipynb
-│   └── 2.05-team2-model-registry.ipynb
+│   ├── 2.05-team2-model-registry.ipynb
+│   └── 3.01-team2-model-serving.ipynb
 │
 ├── pyproject.toml     <- Package metadata, pytest, coverage and ruff configuration
 ├── references         <- ml-canvas.md: requirements analysis and value proposition
@@ -319,6 +403,9 @@ VS Code (Ports tab) or run the server on a shared VM.
     ├── station_profiles.py  <- Step 6: station usage profiles reduced with PCA
     ├── plots.py       <- Charts used by the notebooks
     ├── tracking.py    <- MLflow helpers: runs and dataset logging with digests
+    ├── serving
+    │   ├── schemas.py <- Step 13: Pydantic request and response schemas (the data contract)
+    │   └── app.py     <- Step 13: FastAPI service, POST /predict, GET /health and /model
     └── modeling
         ├── models.py    <- Catalog of baselines and candidates, with their search spaces
         ├── evaluate.py  <- Metrics, segments, success criterion and rolling-origin folds
@@ -326,5 +413,6 @@ VS Code (Ports tab) or run the server on a shared VM.
         ├── tuning.py    <- Step 8: random search with time-based validation
         ├── backtest.py  <- Step 9: rolling-origin backtest and PCA ablation
         ├── registry.py  <- Step 10: champion and challenger in the Model Registry
-        └── predict.py   <- Step 11: batch forecast with the registered champions
+        ├── predict.py   <- Step 11: batch forecast with the registered champions
+        └── export.py    <- Step 12: the champions from the Registry to models/
 ```
