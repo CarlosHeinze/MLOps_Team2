@@ -5,6 +5,7 @@
 PROJECT_NAME = team2_mlops2026
 PYTHON_VERSION = 3.12
 PYTHON_INTERPRETER ?= .venv/bin/python
+LOCK_PYTHON ?= python$(PYTHON_VERSION)
 MLFLOW_PORT ?= 5001
 SERVE_HOST ?= 127.0.0.1
 SERVE_PORT ?= 8000
@@ -16,6 +17,7 @@ DOCKERHUB_REPO ?= racj90120hplmnv09/mibici-ml-service
 DOCKER_PLATFORMS ?= linux/amd64,linux/arm64
 DOCKER_CONTAINER ?= mibici-ml-service
 SMOKE_IMAGE ?= $(DOCKER_IMAGE):latest
+REPRODUCE_ARGS ?= --train-runs --url http://127.0.0.1:$(SERVE_PORT)
 VERSION = $(shell $(PYTHON_INTERPRETER) -c "import re; print(re.search(r'__version__ = .(.+).', open('team2_mlops2026/__init__.py').read()).group(1))")
 GIT_COMMIT = $(shell git rev-parse HEAD)
 MODEL_URIS = $(shell $(PYTHON_INTERPRETER) -c "import json; c = json.load(open('models/model_card.json')); print(','.join(m['uri'] for m in c['models'].values()))")
@@ -26,11 +28,23 @@ DOCKER_LABELS = --build-arg VERSION=$(VERSION) --build-arg GIT_COMMIT=$(GIT_COMM
 #################################################################################
 
 
-## Install Python dependencies
+## Install Python dependencies, every transitive one at the version of requirements-lock.txt
 .PHONY: requirements
 requirements:
-	$(PYTHON_INTERPRETER) -m pip install -r requirements.txt
-	
+	$(PYTHON_INTERPRETER) -m pip install -r requirements.txt -c requirements-lock.txt
+
+
+## Regenerate requirements-lock.txt in a clean venv (LOCK_PYTHON: a Python 3.12 interpreter)
+.PHONY: lock
+lock:
+	rm -rf .lock-venv
+	$(LOCK_PYTHON) -m venv .lock-venv
+	.lock-venv/bin/python -m pip install --quiet --disable-pip-version-check -r requirements.txt
+	head -n 4 requirements-lock.txt > .lock-venv/lock.txt
+	.lock-venv/bin/python -m pip freeze --exclude-editable --disable-pip-version-check >> .lock-venv/lock.txt
+	mv .lock-venv/lock.txt requirements-lock.txt
+	rm -rf .lock-venv
+
 
 
 
@@ -181,6 +195,18 @@ docker-models:
 	docker create --name $(DOCKER_CONTAINER)-models $(DOCKERHUB_REPO):$(VERSION) > /dev/null
 	docker cp $(DOCKER_CONTAINER)-models:/app/models/. models/
 	docker rm $(DOCKER_CONTAINER)-models > /dev/null
+
+
+## Version the champions' tables and reference outputs in a snapshot run (tests/data/reference.json)
+.PHONY: snapshot
+snapshot:
+	$(PYTHON_INTERPRETER) -m team2_mlops2026.modeling.reproducibility snapshot
+
+
+## Compare this machine with the reference: refit the champions, train runs, service (REPRODUCE_ARGS)
+.PHONY: reproduce
+reproduce:
+	$(PYTHON_INTERPRETER) -m team2_mlops2026.modeling.reproducibility compare $(REPRODUCE_ARGS)
 
 
 ## Every step after the data, in order: features, train, tune, evaluate, register, predict
