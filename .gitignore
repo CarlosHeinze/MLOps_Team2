@@ -201,3 +201,7 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Exported models (modeling.export): the versions live in the MLflow Model Registry
+/models/*
+!/models/.gitkeep
