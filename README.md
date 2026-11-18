@@ -41,6 +41,7 @@ reads only the previous step's output, so any step can be re-run on its own.
 | 11. Batch forecast | `team2_mlops2026.modeling.predict` | `data/processed/mibici/predictions/forecast_<YYYYMMDD_HH>h.parquet` and a `predict-<start>` run | `2.05` |
 | 12. Model export | `team2_mlops2026.modeling.export` | `models/mibici-<target>/`: each champion as registered, plus `models/model_card.json` | `3.01` |
 | 13. Online serving | `team2_mlops2026.serving.app` (FastAPI) | `POST /predict`, `GET /health` and `GET /model` on port 8000; schema in `docs/api/` | `3.01` |
+| 14. Container | `Dockerfile` (`make docker-build`, `make docker-push`) | Image [`racj90120hplmnv09/mibici-ml-service`](https://hub.docker.com/r/racj90120hplmnv09/mibici-ml-service) on Docker Hub, for amd64 and arm64 | — |
 
 Every step except the exploratory analysis is tracked in MLflow (see
 [Data versioning](#data-versioning) and [MLflow](#mlflow-comparing-runs-and-the-model-registry)).
@@ -65,7 +66,9 @@ cp .env.example .env               # local MLflow settings; .env is git-ignored
 The `Makefile` uses `.venv/bin/python` by default. If you manage a separate Python 3.12
 environment, pass `PYTHON_INTERPRETER=/path/to/python` to `make` instead.
 `requirements.txt` pins every direct dependency to the versions installed in the local
-Python 3.12 environment used for this branch's unit suite. The pandas, pyarrow, MLflow
+Python 3.12 environment used for this branch's unit suite. It includes
+`requirements-serving.txt`, the subset that the prediction service, its Docker image and the
+logged models need, so each pin lives in one file only. The pandas, pyarrow, MLflow
 and scikit-learn pins also match the combination reported as working in issue
 [#12](https://github.com/CarlosHeinze/MLOps_Team2/issues/12). Transitive dependencies
 are resolved by pip and are not locked; a full clean-machine/full-data reproduction
@@ -241,7 +244,83 @@ Notebook `3.01` sends the 11,208 rows of 9 Sep 2026 to the service and compares 
 batch forecast: the largest difference is 0. After a change to the schemas or the app,
 `make api-docs` regenerates `docs/api/`; a test fails while it is out of date.
 
-### 6. Notebooks
+### 6. Docker image
+
+The image holds the service and the exported champions, so it runs with Docker alone: no
+Python, no MLflow server and no data. It is published on Docker Hub for `linux/amd64`
+(Windows and Intel or AMD Linux) and `linux/arm64` (Apple silicon), and `docker pull` takes
+the one of the machine.
+
+**Run the published image:**
+
+```bash
+docker run -d --name mibici-ml-service -p 8000:8000 racj90120hplmnv09/mibici-ml-service:0.1.0
+curl -s http://127.0.0.1:8000/health
+# {"status":"ok","models_loaded":true,"source":"local"}
+curl -s -X POST http://127.0.0.1:8000/predict \
+  -H "Content-Type: application/json" -d @docs/api/example_request.json
+docker exec mibici-ml-service python -m team2_mlops2026.serving.app check
+docker rm -f mibici-ml-service
+```
+
+`check` runs inside the container: it sends the example request kept in the image and compares
+the answer with `docs/api/example_response.json`. In Windows PowerShell, write `curl.exe`
+instead of `curl`, or open http://127.0.0.1:8000/docs.
+
+**Build and run it locally:**
+
+```bash
+make export                                # or make docker-models (below)
+docker build -t ml-service:latest .        # make docker-build adds the labels
+docker run -p 8000:8000 ml-service:latest  # make docker-run
+make docker-smoke                          # starts ml-service:latest in the background and runs check
+```
+
+The build fails with a clear message if `models/` is empty. Without access to the MLflow
+server, `make docker-models` copies the models out of the published image into `models/`, and
+`make docker-build` then rebuilds the same image from the repository.
+
+**Published tags** ([Docker Hub](https://hub.docker.com/r/racj90120hplmnv09/mibici-ml-service)):
+
+| Tag | Digest | Git commit | Models inside | Platforms | Download size |
+|---|---|---|---|---|---|
+| `0.1.0`, `latest` | `sha256:8bb27ad0ec19...` | `f5fb9bc` | `models:/mibici-departures/1`, `models:/mibici-arrivals/1` (`lgbm_tweedie`, alias `champion`) | linux/amd64, linux/arm64 | 253 MB (amd64), 248 MB (arm64); about 880 MB unpacked |
+
+Each image also carries them as labels: `org.opencontainers.image.version`,
+`org.opencontainers.image.revision` (the commit) and `team2_mlops2026.models` (the model URIs).
+After a pull, `docker image inspect --format '{{json .Config.Labels}}' <image>` shows them, and
+`GET /model` returns the full model card.
+
+**Publish a new version** (the repository owner, or a teammate added as a collaborator on
+Docker Hub under *Settings → Collaborators*, by Docker ID):
+1. Bump `__version__` in `team2_mlops2026/__init__.py`, run `make api-docs` (the OpenAPI
+   schema carries the version) and commit.
+2. `docker login`, then `make docker-push`. It builds both platforms and pushes `:<version>`
+   and `:latest`. It refuses uncommitted changes, since the image is labelled with the
+   commit, and a version that is already published.
+3. Add the row to the table above.
+
+| Inside the image | |
+|---|---|
+| Base | `python:3.12.12-slim-trixie` pinned by digest (the Python of the training environment), plus `libgomp1` for LightGBM |
+| Python packages | `requirements-serving.txt` and this package, in `/opt/venv` (multi-stage build) |
+| Models | `models/` in `/app/models` (`MODEL_DIR`), with `model_card.json` |
+| API examples | `docs/api/example_request.json` and `example_response.json` in `/app/docs/api`, for `check` |
+| User | `app` (uid 10001), not root |
+| Health check | `GET /health` every 30 s; the container turns `healthy` in about 10 s |
+| Command | `uvicorn team2_mlops2026.serving.app:app --host 0.0.0.0 --port 8000` |
+
+**Same forecasts everywhere.** The 11,208 forecasts of 9 Sep 2026 are equal on the amd64 and
+the arm64 image. Against the service run directly on macOS they differ by at most 1.8e-15, the
+last bit of the exponential of another C library, so `check` allows a difference of 1e-9.
+
+**The models' own requirements.** Every model logged from this version on (`make train`,
+`make tune`) declares the pins of `requirements-serving.txt` without the web service, and
+carries a copy of `team2_mlops2026` (MLflow's `code_paths`). `mlflow.sklearn.load_model` then
+works in a clean environment without installing the package. The current champions were logged
+before this change, so they load where the package is installed, as in the image.
+
+### 7. Notebooks
 
 Run them in order: `0.01` → `1.01` → `1.02` → `1.03` → `1.04` → `1.05` → `2.01` → `2.02` →
 `2.03` → `2.04` → `2.05` → `3.01`.
@@ -255,7 +334,7 @@ Run them in order: `0.01` → `1.01` → `1.02` → `1.03` → `1.04` → `1.05`
 - `3.01` needs `make mlflow` and `make serve` running: it sends a night of rows to the service
   and compares the answer with the batch forecast.
 
-### 7. Tests and lint
+### 8. Tests and lint
 
 One command from the project root runs the whole suite:
 
@@ -290,8 +369,8 @@ make lint                        # ruff format --check + ruff check
 
 | Command | Tests | Time |
 |---|---|---|
-| `pytest -q` | 280 | ~2 min |
-| `pytest -q -m "not integration"` | 279 | ~2 min |
+| `pytest -q` | 283 | ~2 min |
+| `pytest -q -m "not integration"` | 282 | ~2 min |
 | `pytest -q -m integration` | 1 | ~15 s |
 
 Times on a Windows laptop (Ryzen 7 4800H, 16 GB). Most of the time goes to the tests that log
@@ -357,7 +436,8 @@ VS Code (Ports tab) or run the server on a shared VM.
 ## Project Organization
 
 ```
-├── Makefile           <- environment, local MLflow, pipeline, export and serving, tests, lint
+├── Dockerfile         <- Image of the prediction service with the exported models
+├── Makefile           <- environment, local MLflow, pipeline, serving, Docker, tests, lint
 ├── README.md
 ├── data               <- Git-ignored; rebuilt by the pipeline
 │   ├── raw            <- MiBici CSVs exactly as published, plus manifest.json
@@ -388,6 +468,7 @@ VS Code (Ports tab) or run the server on a shared VM.
 ├── reports
 │   └── figures        <- Figures for reports and presentations
 ├── requirements.txt   <- Python dependencies (installs this package with `-e .`)
+├── requirements-serving.txt <- The pinned subset for the service, the image and the logged models
 ├── tests              <- pytest suite: one module per source module, plus the end-to-end
 │                         test_pipeline_integration.py
 │
