@@ -18,6 +18,23 @@ classifiers = [
 requires-python = "~=3.12.0"
 
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--strict-markers"]
+markers = [
+    "integration: the pipeline end to end on synthetic data (deselect with -m \"not integration\")",
+]
+filterwarnings = [
+    # Raised inside MLflow's SQLite tracking store, not by this project
+    "ignore:The ``noload`` loader strategy is deprecated:DeprecationWarning",
+]
+
+[tool.coverage.run]
+source = ["team2_mlops2026"]
+
+[tool.coverage.report]
+show_missing = true
+
 [tool.ruff]
 line-length = 99
 src = ["team2_mlops2026"]
