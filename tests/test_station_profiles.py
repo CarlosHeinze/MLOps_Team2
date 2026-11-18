@@ -44,7 +44,9 @@ def test_profile_is_the_share_of_trips_per_direction_and_hour_of_week():
 
 
 def test_profiles_only_count_the_window_and_skip_quiet_stations(features):
-    late = station_rows(7, "departures", "arrivals").assign(**{TIME: HOURS + pd.Timedelta(weeks=8)})
+    late = station_rows(7, "departures", "arrivals").assign(
+        **{TIME: HOURS + pd.Timedelta(weeks=8)}
+    )
     quiet = station_rows(8, "departures", "arrivals").iloc[:24]  # 20 trips on Monday
     rows = pd.concat([features, late, quiet], ignore_index=True)
     profiles = sp.hour_of_week_profiles(rows, end=WEEK0 + pd.Timedelta(weeks=4), min_trips=100)
@@ -72,7 +74,10 @@ def test_weekly_profiles_use_the_weeks_known_before_each_week_starts():
     assert profiles.loc[(1, week2)].sum() == pytest.approx(1)
     assert profiles.loc[(1, week2), "departures_fri_23"] == 1  # the Saturday trip comes too late
     assert profiles.loc[(1, week2 + pd.Timedelta(weeks=1)), "arrivals_sat_00"] == 1
-    assert profiles.index.get_level_values(sp.WEEK).tolist() == [week2, week2 + pd.Timedelta(weeks=1)]
+    assert profiles.index.get_level_values(sp.WEEK).tolist() == [
+        week2,
+        week2 + pd.Timedelta(weeks=1),
+    ]
 
 
 def test_first_component_separates_residential_from_work_stations(features):

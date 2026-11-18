@@ -179,10 +179,42 @@ Run them in order: `0.01` → `1.01` → `1.02` → `1.03` → `1.04` → `1.05`
 
 ### 6. Tests and lint
 
+One command from the project root runs the whole suite:
+
 ```bash
-make test    # pytest: unit tests on small synthetic data, no historical dataset needed
-make lint    # ruff format --check + ruff check
+pytest -q
 ```
+
+It needs no historical data and no MLflow server: the tests build small synthetic trips
+(`tests/trip_factory.py`) and track into a throwaway SQLite store. `make test` runs the same
+command.
+
+```bash
+pytest -q -m "not integration"   # only the unit tests
+pytest -q -m integration         # only the end-to-end test
+pytest -q --cov                  # with the line coverage of team2_mlops2026
+make lint                        # ruff format --check + ruff check
+```
+
+- **Unit tests:** one module per source module (`tests/test_<module>.py`). They cover the
+  rules of each step on hand-made data: the cleaning contract, the lags and the preprocessing
+  (`test_features`), the metrics and the success criterion (`test_evaluate`), the forecast and
+  the profile join (`test_predict`), and the tracked runs, the Registry and the lineage.
+- **Integration test:** `tests/test_pipeline_integration.py`, marked `integration`. It runs
+  the pipeline end to end on three months of synthetic commutes: raw CSVs → normalization →
+  cleaning → features → station profiles → training of a baseline and a small LightGBM →
+  champion in the Registry → 24 h forecast → metrics on the held-out month. At each step it
+  checks the columns the next step reads, so a renamed feature column or a wrong net flow
+  makes it fail.
+
+| Command | Tests | Time |
+|---|---|---|
+| `pytest -q` | 256 | ~2 min |
+| `pytest -q -m "not integration"` | 255 | ~2 min |
+| `pytest -q -m integration` | 1 | ~15 s |
+
+Times on a Windows laptop (Ryzen 7 4800H, 16 GB). Most of the time goes to the tests that log
+runs and models to MLflow.
 
 ## Data versioning
 
@@ -267,12 +299,13 @@ VS Code (Ports tab) or run the server on a shared VM.
 │   ├── 2.04-team2-model-evaluation.ipynb
 │   └── 2.05-team2-model-registry.ipynb
 │
-├── pyproject.toml     <- Package metadata and ruff configuration
+├── pyproject.toml     <- Package metadata, pytest, coverage and ruff configuration
 ├── references         <- ml-canvas.md: requirements analysis and value proposition
 ├── reports
 │   └── figures        <- Figures for reports and presentations
 ├── requirements.txt   <- Python dependencies (installs this package with `-e .`)
-├── tests              <- pytest suite, one module per source module
+├── tests              <- pytest suite: one module per source module, plus the end-to-end
+│                         test_pipeline_integration.py
 │
 └── team2_mlops2026    <- Source code
     ├── config.py      <- Paths and MLflow settings (read from .env)

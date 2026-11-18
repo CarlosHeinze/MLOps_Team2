@@ -44,7 +44,7 @@ format:
 ## Run tests
 .PHONY: test
 test:
-	$(PYTHON_INTERPRETER) -m pytest tests
+	$(PYTHON_INTERPRETER) -m pytest -q
 
 
 ## Set up Python interpreter environment
