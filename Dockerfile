@@ -10,14 +10,15 @@
 # starts from the same image on amd64 and arm64.
 ARG PYTHON_IMAGE=python:3.12.12-slim-trixie@sha256:f3fa41d74a768c2fce8016b98c191ae8c1bacd8f1152870a3f9f87d350920b7c
 
-# --- build: the virtual environment with the pinned serving dependencies and the package ---
+# --- build: the virtual environment with the serving dependencies and the package. Every
+# transitive dependency takes its version from requirements-lock.txt.
 FROM ${PYTHON_IMAGE} AS build
 ENV PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1
 RUN python -m venv /opt/venv
 ENV PATH=/opt/venv/bin:$PATH
 WORKDIR /src
-COPY requirements-serving.txt .
-RUN pip install -r requirements-serving.txt
+COPY requirements-serving.txt requirements-lock.txt ./
+RUN pip install -r requirements-serving.txt -c requirements-lock.txt
 COPY pyproject.toml README.md LICENSE ./
 COPY team2_mlops2026 team2_mlops2026
 RUN pip install --no-deps .

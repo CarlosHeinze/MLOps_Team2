@@ -1,0 +1,418 @@
+{
+  "created_at": "2026-11-18T20:34:59+00:00",
+  "environment": {
+    "os": "macOS-27.0.1-arm64-arm-64bit",
+    "machine": "arm64",
+    "cpu": "Apple M4 Pro",
+    "cpu_count": "12",
+    "container": "False",
+    "python": "3.12.12",
+    "numpy": "2.5.4",
+    "pandas": "3.1.0",
+    "pyarrow": "25.0.1",
+    "scikit-learn": "1.9.1",
+    "scipy": "1.18.1",
+    "lightgbm": "4.7.0",
+    "skops": "0.16.0",
+    "mlflow-skinny": "3.17.2",
+    "fastapi": "0.162.0",
+    "git_commit": "539e72fa0422e9d79dfbe0a3d64dbb889870d8cd"
+  },
+  "test_start": "2025-10",
+  "models": {
+    "departures": {
+      "uri": "models:/mibici-departures/1",
+      "name": "mibici-departures",
+      "version": "1",
+      "model": "lgbm_tweedie",
+      "run_id": "0524ecdd8541472a9f16070b7e3412cf",
+      "test_metrics_run": "6d65e0c1540e45f2b17eb9e9068e118d",
+      "test_metrics": {
+        "group_1_daily_wape": 0.31633361179906716,
+        "group_1_mae": 0.28666853154049154,
+        "group_1_poisson_deviance": 0.5371984058621103,
+        "group_1_rmse": 0.5165886073797936,
+        "group_1_rows": 656891.0,
+        "group_1_wape": 1.1859207141104178,
+        "group_2_daily_wape": 0.2519708194907844,
+        "group_2_mae": 0.509938848565402,
+        "group_2_poisson_deviance": 0.8246120874722432,
+        "group_2_rmse": 0.7889818399125327,
+        "group_2_rows": 674400.0,
+        "group_2_wape": 0.9369090136857555,
+        "group_3_daily_wape": 0.20798977196251142,
+        "group_3_mae": 0.6949440684650566,
+        "group_3_poisson_deviance": 0.9496617164620751,
+        "group_3_rmse": 1.0729248113199605,
+        "group_3_rows": 665693.0,
+        "group_3_wape": 0.724725970402325,
+        "group_4_daily_wape": 0.17977348408660995,
+        "group_4_mae": 0.9089126877597261,
+        "group_4_poisson_deviance": 1.0390271258898949,
+        "group_4_rmse": 1.4232552091654682,
+        "group_4_rows": 673651.0,
+        "group_4_wape": 0.5959849838342888,
+        "group_5_daily_wape": 0.17055445030851463,
+        "group_5_mae": 1.3931730412495194,
+        "group_5_poisson_deviance": 1.315820361614819,
+        "group_5_rmse": 2.418008948653023,
+        "group_5_rows": 674486.0,
+        "group_5_wape": 0.45844593296194036,
+        "overall_daily_wape": 0.19602639293061844,
+        "overall_mae": 0.7426898583378639,
+        "overall_poisson_deviance": 0.9259441152894728,
+        "overall_rmse": 1.3798988791448525,
+        "overall_rows": 3576680.0,
+        "overall_wape": 0.6121555598900094,
+        "peak_daily_wape": 0.2571137607168753,
+        "peak_mae": 1.2476640252261693,
+        "peak_poisson_deviance": 1.2960897877396653,
+        "peak_rmse": 1.9426732532417057,
+        "peak_rows": 639521.0,
+        "peak_wape": 0.5198151022367447,
+        "top_50_daily_wape": 0.16988426771560688,
+        "top_50_mae": 1.543002415182402,
+        "top_50_poisson_deviance": 1.4052228333100525,
+        "top_50_rmse": 2.7186996398228063,
+        "top_50_rows": 437982.0,
+        "top_50_wape": 0.43375978247188984,
+        "unseen_stations_daily_wape": 0.41649662259498454,
+        "unseen_stations_mae": 0.4731674001193631,
+        "unseen_stations_poisson_deviance": 0.7910699935365442,
+        "unseen_stations_rmse": 0.7799162474467314,
+        "unseen_stations_rows": 231559.0,
+        "unseen_stations_wape": 1.116666191096929
+      },
+      "features_digest": "636e73295b9df173482041fd5cd04ede",
+      "profiles_digest": "51c85bee5c1166854a6da55a41631c28"
+    },
+    "arrivals": {
+      "uri": "models:/mibici-arrivals/1",
+      "name": "mibici-arrivals",
+      "version": "1",
+      "model": "lgbm_tweedie",
+      "run_id": "cd78b63838fb491ab138e321cfa76031",
+      "test_metrics_run": "78451c6fadea44759b24ef90b4b2178c",
+      "test_metrics": {
+        "group_1_daily_wape": 0.36049247607109103,
+        "group_1_mae": 0.2414702781083683,
+        "group_1_poisson_deviance": 0.474447635204944,
+        "group_1_rmse": 0.4461109823049505,
+        "group_1_rows": 656878.0,
+        "group_1_wape": 1.2832739767098593,
+        "group_2_daily_wape": 0.25868022322326406,
+        "group_2_mae": 0.4919903036786231,
+        "group_2_poisson_deviance": 0.8005145451706701,
+        "group_2_rmse": 0.7620252859667256,
+        "group_2_rows": 674417.0,
+        "group_2_wape": 0.9340561228606262,
+        "group_3_daily_wape": 0.20558212784482705,
+        "group_3_mae": 0.6851925553283562,
+        "group_3_poisson_deviance": 0.9332530153265952,
+        "group_3_rmse": 1.064794409663579,
+        "group_3_rows": 665686.0,
+        "group_3_wape": 0.7109283393491028,
+        "group_4_daily_wape": 0.17985568098482008,
+        "group_4_mae": 0.8906201006751,
+        "group_4_poisson_deviance": 1.0075314834537958,
+        "group_4_rmse": 1.3893548730548644,
+        "group_4_rows": 674473.0,
+        "group_4_wape": 0.579109990709005,
+        "group_5_daily_wape": 0.1668372189326335,
+        "group_5_mae": 1.3662626691570379,
+        "group_5_poisson_deviance": 1.2749311023528935,
+        "group_5_rmse": 2.3687924063113464,
+        "group_5_rows": 673667.0,
+        "group_5_wape": 0.4404240338359676,
+        "overall_daily_wape": 0.19358218428283852,
+        "overall_mae": 0.7183059196795162,
+        "overall_poisson_deviance": 0.8905286986627906,
+        "overall_rmse": 1.3464778174633536,
+        "overall_rows": 3576680.0,
+        "overall_wape": 0.5920549942409562,
+        "peak_daily_wape": 0.24015669201314066,
+        "peak_mae": 1.1600065158907225,
+        "peak_poisson_deviance": 1.1657594982537631,
+        "peak_rmse": 1.8199724118169003,
+        "peak_rows": 639521.0,
+        "peak_wape": 0.4831211879190814,
+        "top_50_daily_wape": 0.16828290307436788,
+        "top_50_mae": 1.5094588040927095,
+        "top_50_poisson_deviance": 1.3785345107644897,
+        "top_50_rmse": 2.6736360893081046,
+        "top_50_rows": 437982.0,
+        "top_50_wape": 0.4180625693597574,
+        "unseen_stations_daily_wape": 0.3968960110392709,
+        "unseen_stations_mae": 0.43832847234646194,
+        "unseen_stations_poisson_deviance": 0.7510660102855434,
+        "unseen_stations_rmse": 0.7359801937022938,
+        "unseen_stations_rows": 231559.0,
+        "unseen_stations_wape": 1.1049664448879712
+      },
+      "features_digest": "636e73295b9df173482041fd5cd04ede",
+      "profiles_digest": "51c85bee5c1166854a6da55a41631c28"
+    }
+  },
+  "train_runs": {
+    "train-hgb_poisson-arrivals": {
+      "model": "hgb_poisson",
+      "run_id": "530afd919ac5436e9178126e4f365278",
+      "metrics": {
+        "overall_wape": 0.6085341614514927,
+        "peak_wape": 0.5037700466330409,
+        "overall_mae": 0.7382991356372546,
+        "overall_poisson_deviance": 0.9171903274319231
+      }
+    },
+    "train-hgb_poisson-departures": {
+      "model": "hgb_poisson",
+      "run_id": "14bfa39cc6514f1686350e5a1c75c0ff",
+      "metrics": {
+        "overall_wape": 0.6217493824915259,
+        "peak_wape": 0.5263067981994193,
+        "overall_mae": 0.7543294401953237,
+        "overall_poisson_deviance": 0.9451834777385816
+      }
+    },
+    "train-hgb_squared_error-arrivals": {
+      "model": "hgb_squared_error",
+      "run_id": "247cb120df014c96bcb1383ab66ef4b0",
+      "metrics": {
+        "overall_wape": 0.6066598199372896,
+        "peak_wape": 0.4941043521685203,
+        "overall_mae": 0.736025105997695,
+        "overall_poisson_deviance": 0.9381791519864628
+      }
+    },
+    "train-hgb_squared_error-departures": {
+      "model": "hgb_squared_error",
+      "run_id": "81589e41202b43e890df0aa6cb054e72",
+      "metrics": {
+        "overall_wape": 0.6255273577547906,
+        "peak_wape": 0.5276310134482914,
+        "overall_mae": 0.7589130200840405,
+        "overall_poisson_deviance": 0.9685534229615385
+      }
+    },
+    "train-historical_average-arrivals": {
+      "model": "historical_average",
+      "run_id": "6c6d0d2ad8fc4d05a08bac093570d4ed",
+      "metrics": {
+        "overall_wape": 0.6950748352753292,
+        "peak_wape": 0.6130304582093953,
+        "overall_mae": 0.8432939062335427,
+        "overall_poisson_deviance": 1.1081525947777562
+      }
+    },
+    "train-historical_average-departures": {
+      "model": "historical_average",
+      "run_id": "aedbd822c022499ea62da927160db17e",
+      "metrics": {
+        "overall_wape": 0.7160425553139478,
+        "peak_wape": 0.6573147535567855,
+        "overall_mae": 0.868729419145601,
+        "overall_poisson_deviance": 1.1464128658441008
+      }
+    },
+    "train-lgbm_poisson-arrivals": {
+      "model": "lgbm_poisson",
+      "run_id": "993334599dbb41d698cedf7ba632251a",
+      "metrics": {
+        "overall_wape": 0.6170196444627842,
+        "peak_wape": 0.5042451713308377,
+        "overall_mae": 0.7485940790760224,
+        "overall_poisson_deviance": 0.9350245994637524
+      }
+    },
+    "train-lgbm_poisson-departures": {
+      "model": "lgbm_poisson",
+      "run_id": "e2bec39180fb41a892425b6549a74a9d",
+      "metrics": {
+        "overall_wape": 0.6309189266151314,
+        "peak_wape": 0.5301918014893853,
+        "overall_mae": 0.7654542716473274,
+        "overall_poisson_deviance": 0.9662098696215609
+      }
+    },
+    "train-lgbm_tweedie-arrivals": {
+      "model": "lgbm_tweedie",
+      "run_id": "c36a370ebff04569b7e5b25b3939d814",
+      "metrics": {
+        "overall_wape": 0.6025541965163272,
+        "peak_wape": 0.49236551979940607,
+        "overall_mae": 0.7310439916824059,
+        "overall_poisson_deviance": 0.9127386073916907
+      }
+    },
+    "train-lgbm_tweedie-departures": {
+      "model": "lgbm_tweedie",
+      "run_id": "e454b4a77b1e4ab49d70bb2804f3a00a",
+      "metrics": {
+        "overall_wape": 0.621368468922008,
+        "peak_wape": 0.5279595794278186,
+        "overall_mae": 0.7538673017071346,
+        "overall_poisson_deviance": 0.9490089602917998
+      }
+    },
+    "train-poisson_glm-arrivals": {
+      "model": "poisson_glm",
+      "run_id": "74615588aff34c0cba467e0f143dbfa6",
+      "metrics": {
+        "overall_wape": 0.6797305705574128,
+        "peak_wape": 0.5285445384720356,
+        "overall_mae": 0.8246776015199249,
+        "overall_poisson_deviance": 1.0954776662480985
+      }
+    },
+    "train-poisson_glm-departures": {
+      "model": "poisson_glm",
+      "run_id": "c7ee988b77ec4f1ab2878169dfcd1bce",
+      "metrics": {
+        "overall_wape": 0.6976991823143897,
+        "peak_wape": 0.5567675076311837,
+        "overall_mae": 0.8464745578209267,
+        "overall_poisson_deviance": 1.1366412981750411
+      }
+    },
+    "train-seasonal_naive-arrivals": {
+      "model": "seasonal_naive",
+      "run_id": "3fe1a737c1a1437e8bedb46ffeddd4be",
+      "metrics": {
+        "overall_wape": 0.7207729384806929,
+        "peak_wape": 0.5999471332824017,
+        "overall_mae": 0.874471921513379,
+        "overall_poisson_deviance": 5.814973203588732
+      }
+    },
+    "train-seasonal_naive-departures": {
+      "model": "seasonal_naive",
+      "run_id": "839009a4895545e18382c6a67b615451",
+      "metrics": {
+        "overall_wape": 0.7494453867622808,
+        "peak_wape": 0.6488669301079957,
+        "overall_mae": 0.9092549747101104,
+        "overall_poisson_deviance": 6.130910081177414
+      }
+    }
+  },
+  "request": {
+    "rows": [
+      {
+        "station_id": 35,
+        "hour_start": "2026-09-09T08:00:00",
+        "departures_lag_2d": 10.0,
+        "departures_lag_7d": 9.0,
+        "departures_same_hour_4w": 8.75,
+        "departures_mean_7d": 7.809523582458496,
+        "arrivals_lag_2d": 15.0,
+        "arrivals_lag_7d": 14.0,
+        "arrivals_same_hour_4w": 17.0,
+        "arrivals_mean_7d": 9.220237731933594,
+        "weekday": 2,
+        "hour_sin": 0.8660254037844387,
+        "hour_cos": -0.49999999999999983,
+        "month_sin": -0.8660254037844384,
+        "month_cos": -0.5000000000000004,
+        "latitude": 20.677419,
+        "longitude": -103.347983,
+        "capacity": 15.0,
+        "pc1": 0.003775274148210883,
+        "pc2": -0.005498581565916538,
+        "pc3": -0.013305466622114182,
+        "pc4": 0.008916999213397503,
+        "pc5": -0.008239337243139744
+      },
+      {
+        "station_id": 51,
+        "hour_start": "2026-09-09T08:00:00",
+        "departures_lag_2d": 16.0,
+        "departures_lag_7d": 49.0,
+        "departures_same_hour_4w": 45.75,
+        "departures_mean_7d": 12.053571701049805,
+        "arrivals_lag_2d": 14.0,
+        "arrivals_lag_7d": 15.0,
+        "arrivals_same_hour_4w": 15.25,
+        "arrivals_mean_7d": 13.767857551574707,
+        "weekday": 2,
+        "hour_sin": 0.8660254037844387,
+        "hour_cos": -0.49999999999999983,
+        "month_sin": -0.8660254037844384,
+        "month_cos": -0.5000000000000004,
+        "latitude": 20.674139733956636,
+        "longitude": -103.35553513424429,
+        "capacity": 39.0,
+        "pc1": -0.022091777995228767,
+        "pc2": 0.005571958143264055,
+        "pc3": 0.004209625069051981,
+        "pc4": 0.010357506573200226,
+        "pc5": 0.004462800454348326
+      },
+      {
+        "station_id": 271,
+        "hour_start": "2026-09-09T08:00:00",
+        "departures_lag_2d": 21.0,
+        "departures_lag_7d": 16.0,
+        "departures_same_hour_4w": 17.75,
+        "departures_mean_7d": 7.601190567016602,
+        "arrivals_lag_2d": 12.0,
+        "arrivals_lag_7d": 17.0,
+        "arrivals_same_hour_4w": 13.75,
+        "arrivals_mean_7d": 6.25595235824585,
+        "weekday": 2,
+        "hour_sin": 0.8660254037844387,
+        "hour_cos": -0.49999999999999983,
+        "month_sin": -0.8660254037844384,
+        "month_cos": -0.5000000000000004,
+        "latitude": 20.68504,
+        "longitude": -103.34796,
+        "capacity": 31.0,
+        "pc1": -0.006072087213397026,
+        "pc2": -0.0036741066724061966,
+        "pc3": 0.0008933970821090043,
+        "pc4": -0.0052927774377167225,
+        "pc5": -0.002884869696572423
+      }
+    ]
+  },
+  "response": {
+    "predictions": [
+      {
+        "station_id": 35,
+        "hour_start": "2026-09-09T08:00:00",
+        "departures": 9.061821614949976,
+        "arrivals": 16.17382743213058,
+        "net_flow": 7.112005817180604
+      },
+      {
+        "station_id": 51,
+        "hour_start": "2026-09-09T08:00:00",
+        "departures": 46.84400274438855,
+        "arrivals": 14.689625404127986,
+        "net_flow": -32.15437734026056
+      },
+      {
+        "station_id": 271,
+        "hour_start": "2026-09-09T08:00:00",
+        "departures": 18.93634807621048,
+        "arrivals": 14.13712699715718,
+        "net_flow": -4.799221079053298
+      }
+    ],
+    "models": {
+      "departures": {
+        "name": "mibici-departures",
+        "version": "1",
+        "alias": "champion",
+        "uri": "models:/mibici-departures/1"
+      },
+      "arrivals": {
+        "name": "mibici-arrivals",
+        "version": "1",
+        "alias": "champion",
+        "uri": "models:/mibici-arrivals/1"
+      }
+    }
+  },
+  "snapshot_run": "ea0f152256134089863214a3cdd2e4b4",
+  "snapshot_digest": "373aa06d7db0c2573b67a54eb4d3c7e4"
+}

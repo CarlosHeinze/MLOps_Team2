@@ -42,6 +42,7 @@ reads only the previous step's output, so any step can be re-run on its own.
 | 12. Model export | `team2_mlops2026.modeling.export` | `models/mibici-<target>/`: each champion as registered, plus `models/model_card.json` | `3.01` |
 | 13. Online serving | `team2_mlops2026.serving.app` (FastAPI) | `POST /predict`, `GET /health` and `GET /model` on port 8000; schema in `docs/api/` | `3.01` |
 | 14. Container | `Dockerfile` (`make docker-build`, `make docker-push`) | Image [`racj90120hplmnv09/mibici-ml-service`](https://hub.docker.com/r/racj90120hplmnv09/mibici-ml-service) on Docker Hub, for amd64 and arm64 | — |
+| 15. Reproducibility | `team2_mlops2026.modeling.reproducibility` (`make snapshot`, `make reproduce`) | `snapshot-<digest>` run with the champions' tables and reference outputs, `tests/data/reference.json`, `reproduce-<model>` runs | `3.02` |
 
 Every step except the exploratory analysis is tracked in MLflow (see
 [Data versioning](#data-versioning) and [MLflow](#mlflow-comparing-runs-and-the-model-registry)).
@@ -59,7 +60,7 @@ Requirements:
 
 ```bash
 make create_environment            # requires Python 3.12
-make requirements                  # installs into .venv; no implicit pip upgrade
+make requirements                  # installs into .venv with requirements-lock.txt
 cp .env.example .env               # local MLflow settings; .env is git-ignored
 ```
 
@@ -70,9 +71,15 @@ Python 3.12 environment used for this branch's unit suite. It includes
 `requirements-serving.txt`, the subset that the prediction service, its Docker image and the
 logged models need, so each pin lives in one file only. The pandas, pyarrow, MLflow
 and scikit-learn pins also match the combination reported as working in issue
-[#12](https://github.com/CarlosHeinze/MLOps_Team2/issues/12). Transitive dependencies
-are resolved by pip and are not locked; a full clean-machine/full-data reproduction
-still needs verification by a teammate with the historical data.
+[#12](https://github.com/CarlosHeinze/MLOps_Team2/issues/12).
+
+`requirements-lock.txt` pins every package, the transitive ones too (186), as `pip install
+-r requirements.txt` resolved them in a clean Python 3.12 venv. `make requirements` and the
+Docker image install with it as constraints (`-c`), so every machine gets the same versions; a
+package that only one OS needs (such as `colorama` on Windows) is still resolved there. After
+changing a pin in `requirements.txt` or `requirements-serving.txt`, regenerate it with
+`make lock` (`make lock LOCK_PYTHON=/path/to/python3.12` if `python3.12` is not on the path);
+a test fails while a pin is missing from it.
 
 ### 2. MLflow tracking server
 
@@ -254,7 +261,7 @@ the one of the machine.
 **Run the published image:**
 
 ```bash
-docker run -d --name mibici-ml-service -p 8000:8000 racj90120hplmnv09/mibici-ml-service:0.1.0
+docker run -d --name mibici-ml-service -p 8000:8000 racj90120hplmnv09/mibici-ml-service:0.1.1
 curl -s http://127.0.0.1:8000/health
 # {"status":"ok","models_loaded":true,"source":"local"}
 curl -s -X POST http://127.0.0.1:8000/predict \
@@ -284,7 +291,11 @@ server, `make docker-models` copies the models out of the published image into `
 
 | Tag | Digest | Git commit | Models inside | Platforms | Download size |
 |---|---|---|---|---|---|
-| `0.1.0`, `latest` | `sha256:8bb27ad0ec19...` | `f5fb9bc` | `models:/mibici-departures/1`, `models:/mibici-arrivals/1` (`lgbm_tweedie`, alias `champion`) | linux/amd64, linux/arm64 | 253 MB (amd64), 248 MB (arm64); about 880 MB unpacked |
+| `0.1.1`, `latest` | `sha256:41eba4c22003...` | `29448be` | `models:/mibici-departures/1`, `models:/mibici-arrivals/1` (`lgbm_tweedie`, alias `champion`) | linux/amd64, linux/arm64 | 253 MB (amd64), 248 MB (arm64); about 880 MB unpacked |
+| `0.1.0` | `sha256:8bb27ad0ec19...` | `f5fb9bc` | The same | linux/amd64, linux/arm64 | The same |
+
+`0.1.1` installs every transitive dependency from `requirements-lock.txt`; `0.1.0` resolved
+them at build time. Both serve the same models and give the same forecasts.
 
 Each image also carries them as labels: `org.opencontainers.image.version`,
 `org.opencontainers.image.revision` (the commit) and `team2_mlops2026.models` (the model URIs).
@@ -303,7 +314,7 @@ Docker Hub under *Settings → Collaborators*, by Docker ID):
 | Inside the image | |
 |---|---|
 | Base | `python:3.12.12-slim-trixie` pinned by digest (the Python of the training environment), plus `libgomp1` for LightGBM |
-| Python packages | `requirements-serving.txt` and this package, in `/opt/venv` (multi-stage build) |
+| Python packages | `requirements-serving.txt` with `requirements-lock.txt` as constraints, and this package, in `/opt/venv` (multi-stage build) |
 | Models | `models/` in `/app/models` (`MODEL_DIR`), with `model_card.json` |
 | API examples | `docs/api/example_request.json` and `example_response.json` in `/app/docs/api`, for `check` |
 | User | `app` (uid 10001), not root |
@@ -320,10 +331,53 @@ carries a copy of `team2_mlops2026` (MLflow's `code_paths`). `mlflow.sklearn.loa
 works in a clean environment without installing the package. The current champions were logged
 before this change, so they load where the package is installed, as in the image.
 
-### 7. Notebooks
+### 7. Reproducibility
+
+The deployable model can be rebuilt and checked in another environment:
+
+| Piece | Where |
+|---|---|
+| Dependencies | `requirements-lock.txt` (§1), and the image's base pinned by digest |
+| Seeds | `features.SEED = 42` reaches every random source (ML Canvas §8) |
+| Model, inputs and reference outputs | The `snapshot-373aa06d7db0` run in MLflow: the feature table and the station profiles that trained the champions, with their digests, and the reference set (the champions' test metrics, request rows with their expected forecasts, the metrics of the 14 `train-*` runs). The registered versions carry the tag `snapshot_run`. A copy of the reference set is in `tests/data/reference.json` |
+
+```bash
+make snapshot     # once per champion: needs the MLflow server, models/ and the feature table
+make reproduce    # on any machine: refit the champions, compare the train runs, check the service
+make reproduce REPRODUCE_ARGS="--no-track --url http://127.0.0.1:8000 --save docs/reproducibility/<name>.json"
+```
+
+`make reproduce` (`python -m team2_mlops2026.modeling.reproducibility compare`):
+1. checks that the local feature table has the snapshot's digests, and refuses to go on otherwise;
+2. refits each champion with its own params (an unfitted clone of the exported model) on the
+   training split, and compares its test metrics with the reference. It also scores the exported
+   champion, so a difference in the data shows up apart from one in the training;
+3. with `--train-runs`, compares the latest local `train-*` runs (`make train`) with the
+   reference ones;
+4. with `--url`, sends the reference rows to a running service and compares the forecasts;
+5. logs a `reproduce-<model>` run with the environment (OS, CPU, Python, packages, commit) and
+   the differences, unless `--no-track`, and exits with 1 if a check fails.
+
+The tolerances are `METRIC_RTOL` in `modeling/reproducibility.py`: `1e-9` for the baselines,
+`1e-4` for LightGBM, `5e-3` for the histogram boosting. The ML Canvas §8 explains them and what
+is reproduced bit for bit. Results, in [docs/verificacion-fase3.md](docs/verificacion-fase3.md)
+and notebook `3.02`:
+
+| Environment | Refit: largest relative metric difference (departures / arrivals) | Service: golden forecasts |
+|---|---|---|
+| macOS, Apple M4 Pro (the machine of the snapshot) | 1.4e-14 / 1.1e-13 | Image `0.1.0`: difference 0 |
+| Clean Linux container (aarch64): clone, `make requirements`, `make test`, `make reproduce` | 8.4e-15 / 1.5e-13 | Image `0.1.1` from Docker Hub: difference 0 |
+| Another machine (a teammate) | Pending | Pending |
+
+The golden test (`tests/test_reproducibility.py`) runs in `pytest -q`. It checks that the
+reference request still fits the API and that the reference is the documented example. When
+`models/` holds the reference versions (`make export` or `make docker-models`), it also checks
+that they give the golden forecasts; otherwise that one test is skipped.
+
+### 8. Notebooks
 
 Run them in order: `0.01` → `1.01` → `1.02` → `1.03` → `1.04` → `1.05` → `2.01` → `2.02` →
-`2.03` → `2.04` → `2.05` → `3.01`.
+`2.03` → `2.04` → `2.05` → `3.01` → `3.02`.
 - `0.01`, `1.01`, `1.02`, `1.04` and `1.05` each run their pipeline step, skipping files that
   are already up to date, and validate its output.
 - `1.03` only reads `data/processed`. It first checks that data against the cleaning contract,
@@ -333,8 +387,10 @@ Run them in order: `0.01` → `1.01` → `1.02` → `1.03` → `1.04` → `1.05`
   champions and runs the batch forecast.
 - `3.01` needs `make mlflow` and `make serve` running: it sends a night of rows to the service
   and compares the answer with the batch forecast.
+- `3.02` needs `make mlflow` and the image running on port 8000. It refits the champions (about
+  six minutes) and compares them, and the results of `docs/reproducibility/`, with the reference.
 
-### 8. Tests and lint
+### 9. Tests and lint
 
 One command from the project root runs the whole suite:
 
@@ -369,8 +425,8 @@ make lint                        # ruff format --check + ruff check
 
 | Command | Tests | Time |
 |---|---|---|
-| `pytest -q` | 283 | ~2 min |
-| `pytest -q -m "not integration"` | 282 | ~2 min |
+| `pytest -q` | 292 | ~2 min |
+| `pytest -q -m "not integration"` | 291 | ~2 min |
 | `pytest -q -m integration` | 1 | ~15 s |
 
 Times on a Windows laptop (Ryzen 7 4800H, 16 GB). Most of the time goes to the tests that log
@@ -446,7 +502,9 @@ VS Code (Ports tab) or run the server on a shared VM.
 │                         and forecasts
 │
 ├── docs
-│   └── api            <- OpenAPI schema and an example request and response (make api-docs)
+│   ├── api            <- OpenAPI schema and an example request and response (make api-docs)
+│   ├── reproducibility  <- Results of make reproduce in other environments, and the container script
+│   └── verificacion-fase3.md <- The clean-environment checks of Phase 3
 ├── models             <- Git-ignored; the champions exported for serving, plus model_card.json
 │                         (make export). The versions live in the MLflow Model Registry
 ├── notebooks          <- PHASE.NOTEBOOK-team2-description, run in order
@@ -461,7 +519,8 @@ VS Code (Ports tab) or run the server on a shared VM.
 │   ├── 2.03-team2-hyperparameter-tuning.ipynb
 │   ├── 2.04-team2-model-evaluation.ipynb
 │   ├── 2.05-team2-model-registry.ipynb
-│   └── 3.01-team2-model-serving.ipynb
+│   ├── 3.01-team2-model-serving.ipynb
+│   └── 3.02-team2-reproducibility.ipynb
 │
 ├── pyproject.toml     <- Package metadata, pytest, coverage and ruff configuration
 ├── references         <- ml-canvas.md: requirements analysis and value proposition
@@ -469,8 +528,10 @@ VS Code (Ports tab) or run the server on a shared VM.
 │   └── figures        <- Figures for reports and presentations
 ├── requirements.txt   <- Python dependencies (installs this package with `-e .`)
 ├── requirements-serving.txt <- The pinned subset for the service, the image and the logged models
+├── requirements-lock.txt    <- Every package at its version, transitive ones too (make lock)
 ├── tests              <- pytest suite: one module per source module, plus the end-to-end
-│                         test_pipeline_integration.py
+│   │                     test_pipeline_integration.py
+│   └── data           <- reference.json: the golden reference set of the champions (make snapshot)
 │
 └── team2_mlops2026    <- Source code
     ├── config.py      <- Paths and MLflow settings (read from .env)
@@ -495,5 +556,6 @@ VS Code (Ports tab) or run the server on a shared VM.
         ├── backtest.py  <- Step 9: rolling-origin backtest and PCA ablation
         ├── registry.py  <- Step 10: champion and challenger in the Model Registry
         ├── predict.py   <- Step 11: batch forecast with the registered champions
-        └── export.py    <- Step 12: the champions from the Registry to models/
+        ├── export.py    <- Step 12: the champions from the Registry to models/
+        └── reproducibility.py <- Snapshot, reference set and comparison in another environment
 ```

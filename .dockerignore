@@ -5,6 +5,7 @@
 !README.md
 !LICENSE
 !requirements-serving.txt
+!requirements-lock.txt
 !team2_mlops2026/
 !models/
 !docs/api/example_request.json
