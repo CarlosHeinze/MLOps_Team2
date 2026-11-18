@@ -6,10 +6,10 @@ import pandas as pd
 from trip_factory import STATIONS, make_trips
 
 from team2_mlops2026 import features as ft
+from team2_mlops2026 import station_profiles as sp
 from team2_mlops2026.modeling import predict as pr
 from team2_mlops2026.modeling import train as tr
 from team2_mlops2026.modeling.models import MODELS
-from team2_mlops2026.station_profiles import WEEK
 
 DAY0 = pd.Timestamp("2024-01-01")  # a Monday
 
@@ -42,7 +42,7 @@ def test_forecast_clips_negative_demand_and_nets_arrivals_minus_departures():
 def test_join_profiles_takes_the_last_scored_week_and_leaves_unscored_stations_empty():
     weeks = DAY0 + pd.to_timedelta([0, 7], unit="D")
     scores = pd.DataFrame(
-        {ft.STATION: [1, 1, 2], WEEK: weeks[[0, 1, 0]], "pc1": [0.1, 0.2, 0.3], "pc2": 0.0}
+        {ft.STATION: [1, 1, 2], sp.WEEK: weeks[[0, 1, 0]], "pc1": [0.1, 0.2, 0.3], "pc2": 0.0}
     )
     times = DAY0 + pd.to_timedelta([1, 8, 15, 30, 8, 1], unit="D")
     rows = pd.DataFrame({ft.STATION: [1, 1, 1, 1, 2, 3], ft.TIME: times, "x": range(6)})
@@ -69,7 +69,7 @@ def test_a_candidate_forecasts_a_station_unseen_in_training_a_week_after_the_las
     table = ft.build_features(trips, STATIONS, DAY0)
     weeks = pd.date_range(DAY0, periods=2, freq="W-MON")
     scores = pd.DataFrame(
-        {ft.STATION: [1, 2, 1, 2], WEEK: weeks.repeat(2), "pc1": [0.5, -0.5, 0.4, -0.4]}
+        {ft.STATION: [1, 2, 1, 2], sp.WEEK: weeks.repeat(2), "pc1": [0.5, -0.5, 0.4, -0.4]}
     )
     train = pr.join_profiles(table[table[ft.TIME] < opens], scores)
     models = {

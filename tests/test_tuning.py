@@ -1,6 +1,6 @@
 import mlflow
-from mlflow.tracking import MlflowClient
 import mlflow.sklearn
+from mlflow.tracking import MlflowClient
 import numpy as np
 import pandas as pd
 import pytest

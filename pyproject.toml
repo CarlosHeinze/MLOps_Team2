@@ -38,7 +38,7 @@ show_missing = true
 [tool.ruff]
 line-length = 99
 src = ["team2_mlops2026"]
-include = ["pyproject.toml", "team2_mlops2026/**/*.py"]
+include = ["pyproject.toml", "team2_mlops2026/**/*.py", "tests/**/*.py"]
 
 [tool.ruff.lint]
 extend-select = ["I"]  # Add import sorting

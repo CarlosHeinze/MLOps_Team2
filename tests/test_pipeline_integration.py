@@ -199,6 +199,8 @@ def test_pipeline_runs_from_raw_csvs_to_scored_forecasts(tmp_path, mlflow_store,
     # --- metrics: the champions on the held-out month, against the baseline -------------
     train_rows, test_rows = tr.load_training_data(features_dir, TEST_START)
     assert test_rows["hour_start"].dt.to_period("M").astype(str).eq(TEST_START).all()
+    assert (train_rows["hour_start"] < pd.Timestamp(TEST_START)).all()
+    assert NEW_STATION not in set(train_rows["station_id"])  # unseen until the test month
     inputs = tr.model_inputs(test_rows)
     for target in ft.TARGETS:
         champion, _ = reg.load_model(target)
@@ -211,5 +213,8 @@ def test_pipeline_runs_from_raw_csvs_to_scored_forecasts(tmp_path, mlflow_store,
         logged = mlflow.get_run(versions[target].run_id).data.metrics
         assert logged["overall_wape"] == pytest.approx(report.loc["overall", "wape"])
 
-        check = ev.success_criterion(report, {BASELINE: trained[BASELINE, target].report})
-        assert check.baseline == BASELINE and np.isfinite(check.peak_wape_improvement)
+        baseline = trained[BASELINE, target].report
+        check = ev.success_criterion(report, {BASELINE: baseline})
+        peak_wapes = report.loc["peak", "wape"], baseline.loc["peak", "wape"]
+        assert np.isfinite(peak_wapes).all()
+        assert check.peak_wape_improvement == pytest.approx(1 - peak_wapes[0] / peak_wapes[1])

@@ -2,10 +2,10 @@ import matplotlib
 
 matplotlib.use("Agg")
 
-import matplotlib.pyplot as plt  # noqa: E402
-import pandas as pd  # noqa: E402
+import matplotlib.pyplot as plt
+import pandas as pd
 
-from team2_mlops2026 import plots  # noqa: E402
+from team2_mlops2026 import plots
 
 
 def test_grouped_bars_draw_a_bar_per_cell_and_the_references():

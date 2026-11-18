@@ -204,7 +204,7 @@ def test_preprocessor_outputs_one_column_per_encoded_feature(table):
 
 
 def test_no_target_reaches_the_model_through_the_preprocessor(table):
-    # Fitted on the full table, targets included, as a careless caller would pass it
+    # Fitted on rows that still carry the targets, as a careless caller would pass them
     train, test = ft.time_split(table, NEW_STATION_OPENS)
     preprocessor = ft.make_preprocessor().fit(train, train["departures"])
     names = preprocessor.get_feature_names_out()
