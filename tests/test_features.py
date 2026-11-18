@@ -183,6 +183,38 @@ def test_preprocessor_flags_the_stations_without_a_profile(table):
     assert (flag == test[ft.STATION].eq(3).to_numpy()).all()
 
 
+def test_preprocessor_outputs_one_column_per_encoded_feature(table):
+    scores = pd.DataFrame({ft.STATION: [1, 2], "pc1": [0.5, -0.5], "pc2": [0.1, 0.2]})
+    rows = table.merge(scores, on=ft.STATION, how="left")
+    preprocessor = ft.make_preprocessor().fit(rows, rows["departures"])
+    assert list(preprocessor.get_feature_names_out()) == [
+        "station__station_id",
+        *(f"weekday__weekday_{d}" for d in range(7)),
+        *(f"cyclical__{c}" for c in ("hour_sin", "hour_cos", "month_sin", "month_cos")),
+        *(
+            f"demand__{target}_{lag}"
+            for target in ("departures", "arrivals")
+            for lag in ("lag_2d", "lag_7d", "same_hour_4w", "mean_7d")
+        ),
+        *(f"station_attrs__{c}" for c in ("latitude", "longitude", "capacity")),
+        "profiles__pc1",
+        "profiles__pc2",
+        "no_profile__missingindicator_pc1",
+    ]
+
+
+def test_no_target_reaches_the_model_through_the_preprocessor(table):
+    # Fitted on the full table, targets included, as a careless caller would pass it
+    train, test = ft.time_split(table, NEW_STATION_OPENS)
+    preprocessor = ft.make_preprocessor().fit(train, train["departures"])
+    names = preprocessor.get_feature_names_out()
+    assert not any(name.split("__")[-1] in ft.TARGETS for name in names)
+    # The same hour's demand never changes the inputs the model sees
+    rng = np.random.default_rng(ft.SEED)
+    scrambled = test.assign(**{t: rng.permutation(test[t].to_numpy()) + 5 for t in ft.TARGETS})
+    pd.testing.assert_frame_equal(preprocessor.transform(test), preprocessor.transform(scrambled))
+
+
 # --- tracked build -------------------------------------------------------------
 
 
