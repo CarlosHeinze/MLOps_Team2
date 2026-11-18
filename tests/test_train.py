@@ -1,4 +1,8 @@
+from pathlib import Path
+
 import mlflow
+import mlflow.artifacts
+import mlflow.pyfunc
 import mlflow.sklearn
 import numpy as np
 import pandas as pd
@@ -7,6 +11,7 @@ from trip_factory import STATIONS, make_trips
 
 from team2_mlops2026 import features as ft
 from team2_mlops2026 import station_profiles as sp
+from team2_mlops2026.modeling import models as models_module
 from team2_mlops2026.modeling import train as tr
 from team2_mlops2026.tracking import input_digests
 
@@ -129,3 +134,34 @@ def test_train_tracked_logs_each_model_and_target_with_its_lineage(lineage):
         model = mlflow.sklearn.load_model(f"runs:/{result.run_id}/{tr.MODEL_ARTIFACT}")
         X = tr.model_inputs(test)
         assert np.allclose(model.predict(X), result.estimator.predict(X))
+
+
+# --- logged model requirements -------------------------------------------------
+
+
+def test_logged_models_declare_the_serving_pins_and_carry_the_package(lineage):
+    """A logged model loads in a clean environment: its requirements are the pins of
+    requirements-serving.txt without the web service, and it carries a copy of the package."""
+    [result] = tr.train_tracked(["seasonal_naive"], ["departures"], lineage["dir"], TEST_START)
+    uri = f"runs:/{result.run_id}/{tr.MODEL_ARTIFACT}"
+    logged = Path(mlflow.pyfunc.get_model_dependencies(uri)).read_text().split()
+    assert logged == tr.model_requirements()
+
+    serving = {line for line in tr.SERVING_REQUIREMENTS.read_text().splitlines() if "==" in line}
+    assert set(logged) <= serving
+    names = {pin.split("==")[0] for pin in logged}
+    assert {"lightgbm", "scikit-learn", "skops", "numpy", "pandas", "mlflow-skinny"} <= names
+    assert not names & set(tr.WEB_PACKAGES)
+
+    code = Path(mlflow.artifacts.download_artifacts(uri)) / "code" / "team2_mlops2026"
+    assert (code / "modeling" / "models.py").read_text() == Path(
+        models_module.__file__
+    ).read_text()
+    assert not list(code.rglob("__pycache__"))
+
+
+def test_requirements_include_the_serving_pins_without_repeating_them():
+    lines = (tr.PROJ_ROOT / "requirements.txt").read_text().splitlines()
+    assert lines[0] == "-r requirements-serving.txt"
+    serving = {pin.split("==")[0] for pin in tr.model_requirements(tr.SERVING_REQUIREMENTS)}
+    assert not serving & {line.split("==")[0] for line in lines if "==" in line}

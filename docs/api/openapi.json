@@ -4,7 +4,7 @@
     "title": "MiBici station demand forecast",
     "summary": "Hourly departures and arrivals of every MiBici station (Guadalajara)",
     "description": "Serves the registered champions `models:/mibici-departures@champion` and `models:/mibici-arrivals@champion`. Send the feature rows of the station-hours to forecast; the batch forecast (`modeling.predict`) gives the same numbers.",
-    "version": "0.0.1"
+    "version": "0.1.0"
   },
   "paths": {
     "/predict": {

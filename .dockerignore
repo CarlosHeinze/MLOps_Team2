@@ -1,0 +1,14 @@
+# Allow-list: the build context holds only what the image needs, so data/, mlartifacts/,
+# mlflow.db, .env, .venv/, notebooks/, reports/ and the caches never reach it.
+*
+!pyproject.toml
+!README.md
+!LICENSE
+!requirements-serving.txt
+!team2_mlops2026/
+!models/
+!docs/api/example_request.json
+!docs/api/example_response.json
+**/__pycache__
+**/*.py[co]
+models/.gitkeep
