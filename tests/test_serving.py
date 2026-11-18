@@ -85,6 +85,8 @@ def synthetic(tmp_path_factory):
             ex.model_dir(target, root),
             serialization_format="skops",
             skops_trusted_types=TRUSTED_TYPES,
+            pip_requirements=tr.model_requirements(),  # no inference: ~6 s per model
+            code_paths=[str(tr.PACKAGE_DIR)],
         )
     card = {
         "exported_at": "2026-11-18T00:00:00+00:00",
@@ -277,3 +279,28 @@ def test_the_committed_api_docs_match_the_service():
     assert [(r.station_id, r.hour_start) for r in rows] == [
         (p.station_id, p.hour_start) for p in predictions
     ]
+
+
+# --- check --------------------------------------------------------------------------
+
+
+def test_check_compares_two_responses_within_the_tolerance():
+    expected = json.loads((api.API_DOCS_DIR / api.EXAMPLE_RESPONSE).read_text(encoding="utf-8"))
+    assert api.compare_predictions(expected, expected) == 0
+
+    def changed(**change) -> dict:
+        served = json.loads(json.dumps(expected))
+        served["predictions"][0] |= change
+        return served
+
+    departures = expected["predictions"][0]["departures"]
+    close = changed(departures=departures * (1 + 1e-12))  # last digits, another CPU
+    assert 0 < api.compare_predictions(expected, close) < 1e-9
+    with pytest.raises(ValueError, match="differ by up to"):
+        api.compare_predictions(expected, changed(departures=departures + 0.01))
+    with pytest.raises(ValueError, match="other station-hours"):
+        api.compare_predictions(expected, changed(station_id=-1))
+    other_models = json.loads(json.dumps(expected))
+    other_models["models"]["arrivals"]["version"] = "2"
+    with pytest.raises(ValueError, match="Served by"):
+        api.compare_predictions(expected, other_models)

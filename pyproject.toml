@@ -4,7 +4,7 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "team2_mlops2026"
-version = "0.0.1"
+dynamic = ["version"]  # __version__ in team2_mlops2026/__init__.py
 description = "Project for MLOps Course for the Master in Applied AI from Tec de Monterrey"
 authors = [
   { name = "Team 2 MNA MLOps" },

@@ -9,6 +9,18 @@ MLFLOW_PORT ?= 5001
 SERVE_HOST ?= 127.0.0.1
 SERVE_PORT ?= 8000
 
+# Docker image of the prediction service. The version is __version__ of the package, the
+# commit the one checked out, and the model URIs those of models/model_card.json.
+DOCKER_IMAGE ?= ml-service
+DOCKERHUB_REPO ?= racj90120hplmnv09/mibici-ml-service
+DOCKER_PLATFORMS ?= linux/amd64,linux/arm64
+DOCKER_CONTAINER ?= mibici-ml-service
+SMOKE_IMAGE ?= $(DOCKER_IMAGE):latest
+VERSION = $(shell $(PYTHON_INTERPRETER) -c "import re; print(re.search(r'__version__ = .(.+).', open('team2_mlops2026/__init__.py').read()).group(1))")
+GIT_COMMIT = $(shell git rev-parse HEAD)
+MODEL_URIS = $(shell $(PYTHON_INTERPRETER) -c "import json; c = json.load(open('models/model_card.json')); print(','.join(m['uri'] for m in c['models'].values()))")
+DOCKER_LABELS = --build-arg VERSION=$(VERSION) --build-arg GIT_COMMIT=$(GIT_COMMIT) --build-arg MODELS=$(MODEL_URIS)
+
 #################################################################################
 # COMMANDS                                                                      #
 #################################################################################
@@ -131,6 +143,44 @@ serve:
 .PHONY: api-docs
 api-docs:
 	$(PYTHON_INTERPRETER) -m team2_mlops2026.serving.app api-docs
+
+
+## Build the image of the service with the models in models/: ml-service:latest and :<version>
+.PHONY: docker-build
+docker-build:
+	docker build $(DOCKER_LABELS) -t $(DOCKER_IMAGE):latest -t $(DOCKER_IMAGE):$(VERSION) .
+
+
+## Run the image on http://127.0.0.1:8000 (Ctrl+C stops it)
+.PHONY: docker-run
+docker-run:
+	docker run --rm --name $(DOCKER_CONTAINER) -p $(SERVE_PORT):8000 $(DOCKER_IMAGE):latest
+
+
+## Start an image in the background and check it against docs/api/ (SMOKE_IMAGE=repo:tag)
+.PHONY: docker-smoke
+docker-smoke:
+	docker run -d --rm --name $(DOCKER_CONTAINER)-smoke $(SMOKE_IMAGE)
+	docker exec $(DOCKER_CONTAINER)-smoke python -m team2_mlops2026.serving.app check; \
+	status=$$?; docker stop $(DOCKER_CONTAINER)-smoke > /dev/null; exit $$status
+
+
+## Build for amd64 and arm64 and push :<version> and :latest to Docker Hub (commit first)
+.PHONY: docker-push
+docker-push:
+	@git diff --quiet HEAD -- || { echo "Commit first: the image is labelled with the commit"; exit 1; }
+	@! docker buildx imagetools inspect $(DOCKERHUB_REPO):$(VERSION) > /dev/null 2>&1 \
+		|| { echo "$(DOCKERHUB_REPO):$(VERSION) is already published: bump __version__"; exit 1; }
+	docker buildx build --platform $(DOCKER_PLATFORMS) $(DOCKER_LABELS) \
+		-t $(DOCKERHUB_REPO):$(VERSION) -t $(DOCKERHUB_REPO):latest --push .
+
+
+## Copy the models of the published image into models/, to rebuild it without the MLflow server
+.PHONY: docker-models
+docker-models:
+	docker create --name $(DOCKER_CONTAINER)-models $(DOCKERHUB_REPO):$(VERSION) > /dev/null
+	docker cp $(DOCKER_CONTAINER)-models:/app/models/. models/
+	docker rm $(DOCKER_CONTAINER)-models > /dev/null
 
 
 ## Every step after the data, in order: features, train, tune, evaluate, register, predict

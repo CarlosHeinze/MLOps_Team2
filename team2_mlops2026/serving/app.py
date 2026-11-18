@@ -17,21 +17,26 @@ Online prediction service: the champions' forecasts over HTTP with FastAPI.
   batch, 503 without models, and 500 with no traceback if the forecast itself fails.
 - Swagger UI at ``/docs``; the OpenAPI schema and an example request and response are kept in
   ``docs/api/`` (``api-docs`` command).
+- ``check`` tests a running service (local or a container): it waits for ``/health``, sends the
+  example request and compares the answer with the example response. The same image built on
+  another CPU may differ in the last digits, so the comparison has a tolerance
+  (``CHECK_RTOL``, ``CHECK_ATOL``).
 
 Usage:
     make serve   # uvicorn team2_mlops2026.serving.app:app --port 8000
     MODEL_SOURCE=registry make serve
     python -m team2_mlops2026.serving.app api-docs
+    python -m team2_mlops2026.serving.app check --url http://127.0.0.1:8000
 """
 
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from importlib.metadata import PackageNotFoundError, version
 import json
 import os
 from pathlib import Path
+import time
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, status
@@ -40,10 +45,12 @@ from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from loguru import logger
+import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator
 import typer
 
+from team2_mlops2026 import __version__ as VERSION
 from team2_mlops2026.config import MODELS_DIR, PROJ_ROOT
 from team2_mlops2026.features import FEATURES_DIR, STATION, TARGETS, TIME
 from team2_mlops2026.modeling import export, predict
@@ -60,17 +67,15 @@ from team2_mlops2026.serving.schemas import (
 )
 
 LOCAL, REGISTRY = "local", "registry"
-API_DOCS_DIR = PROJ_ROOT / "docs" / "api"
+# The Docker image keeps a copy of the examples in /app/docs/api
+API_DOCS_DIR = Path(os.getenv("API_DOCS_DIR", PROJ_ROOT / "docs" / "api"))
 OPENAPI_FILE = "openapi.json"
 EXAMPLE_REQUEST, EXAMPLE_RESPONSE = "example_request.json", "example_response.json"
 # The example rows: the morning peak of the night replayed in notebook 2.05
 EXAMPLE_START = "2026-09-09 08:00"
 EXAMPLE_STATIONS = 3
-
-try:
-    VERSION = version("team2_mlops2026")
-except PackageNotFoundError:  # running from a source tree that was not installed
-    VERSION = "0+unknown"
+# check: the forecasts may differ in the last digits on another CPU (exp of the Tweedie link)
+CHECK_RTOL = CHECK_ATOL = 1e-9
 
 
 @dataclass(frozen=True)
@@ -274,6 +279,70 @@ def api_docs(
     _write_json(dst / EXAMPLE_RESPONSE, response.json())
     logger.success(
         "Wrote {}, {} and {} to {}", OPENAPI_FILE, EXAMPLE_REQUEST, EXAMPLE_RESPONSE, dst
+    )
+
+
+def compare_predictions(
+    expected: dict, served: dict, rtol: float = CHECK_RTOL, atol: float = CHECK_ATOL
+) -> float:
+    """The largest absolute difference between two ``POST /predict`` responses. Raises
+    ValueError if their models or station-hours differ, or a value beyond the tolerance."""
+    if served["models"] != expected["models"]:
+        raise ValueError(f"Served by {served['models']}, expected {expected['models']}")
+    keys = [(p[STATION], p[TIME]) for p in expected["predictions"]]
+    if [(p[STATION], p[TIME]) for p in served["predictions"]] != keys:
+        raise ValueError("The response has other station-hours than the expected one")
+    columns = [*TARGETS, predict.NET_FLOW]
+    want = np.array([[p[c] for c in columns] for p in expected["predictions"]], dtype=float)
+    got = np.array([[p[c] for c in columns] for p in served["predictions"]], dtype=float)
+    if not np.allclose(got, want, rtol=rtol, atol=atol):
+        raise ValueError(f"The forecasts differ by up to {np.abs(got - want).max():.3g}")
+    return float(np.abs(got - want).max())
+
+
+def _http_json(url: str, body: dict | None = None, timeout: float = 30) -> dict:
+    import urllib.request
+
+    data = None if body is None else json.dumps(body).encode()
+    request = urllib.request.Request(url, data, {"Content-Type": "application/json"})
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        return json.load(response)
+
+
+@cli.command()
+def check(
+    url: Annotated[str, typer.Option(help="Base URL of the service")] = "http://127.0.0.1:8000",
+    examples: Annotated[Path, typer.Option(help="Folder with the example files")] = API_DOCS_DIR,
+    wait: Annotated[float, typer.Option(help="Seconds to wait for /health")] = 60,
+):
+    """Check a running service: health, then the example request against the example
+    response."""
+    deadline = time.monotonic() + wait
+    while True:
+        try:
+            health = _http_json(f"{url}/health", timeout=5)
+            break
+        except OSError as error:  # not up yet (connection refused) or 503 (HTTPError)
+            if time.monotonic() > deadline:
+                logger.error("{}/health did not answer 200 within {} s: {}", url, wait, error)
+                raise typer.Exit(1) from None
+            time.sleep(1)
+    request = json.loads((examples / EXAMPLE_REQUEST).read_text(encoding="utf-8"))
+    expected = json.loads((examples / EXAMPLE_RESPONSE).read_text(encoding="utf-8"))
+    served = _http_json(f"{url}/predict", request)
+    try:
+        diff = compare_predictions(expected, served)
+    except ValueError as error:
+        logger.error("{}", error)
+        raise typer.Exit(1) from None
+    logger.success(
+        "{} ({} models) answered the {} example rows like {} (largest difference {:.3g}) with {}",
+        url,
+        health["source"],
+        len(request["rows"]),
+        EXAMPLE_RESPONSE,
+        diff,
+        ", ".join(m["uri"] for m in served["models"].values()),
     )
 
 
