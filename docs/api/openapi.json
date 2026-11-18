@@ -1,0 +1,667 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "MiBici station demand forecast",
+    "summary": "Hourly departures and arrivals of every MiBici station (Guadalajara)",
+    "description": "Serves the registered champions `models:/mibici-departures@champion` and `models:/mibici-arrivals@champion`. Send the feature rows of the station-hours to forecast; the batch forecast (`modeling.predict`) gives the same numbers.",
+    "version": "0.0.1"
+  },
+  "paths": {
+    "/predict": {
+      "post": {
+        "summary": "Forecast the departures and arrivals of station-hours",
+        "description": "Expected departures and arrivals of each row (clipped at 0) and the net flow\n(arrivals - departures), with the champion of each target, as the batch forecast.",
+        "operationId": "predict_rows_predict_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PredictRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PredictResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Empty batch or more than 25,000 rows"
+          },
+          "500": {
+            "description": "The forecast failed (details in the service log)"
+          },
+          "503": {
+            "description": "The models are not loaded"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Whether the models are loaded",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The models are not loaded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/model": {
+      "get": {
+        "summary": "The model card of the served models",
+        "description": "Name, version, alias, URI, source run and Registry tags of each target's model.",
+        "operationId": "model_card_model_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelCard"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The models are not loaded"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "FeatureRow": {
+        "properties": {
+          "station_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Station Id",
+            "description": "MiBici station id"
+          },
+          "hour_start": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Hour Start",
+            "description": "Hour to forecast, local time without time zone"
+          },
+          "departures_lag_2d": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Departures Lag 2D",
+            "description": "Trips (null if unknown, e.g. before the station opened)"
+          },
+          "departures_lag_7d": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Departures Lag 7D",
+            "description": "Trips (null if unknown, e.g. before the station opened)"
+          },
+          "departures_same_hour_4w": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Departures Same Hour 4W",
+            "description": "Trips (null if unknown, e.g. before the station opened)"
+          },
+          "departures_mean_7d": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Departures Mean 7D",
+            "description": "Trips (null if unknown, e.g. before the station opened)"
+          },
+          "arrivals_lag_2d": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Arrivals Lag 2D",
+            "description": "Trips (null if unknown, e.g. before the station opened)"
+          },
+          "arrivals_lag_7d": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Arrivals Lag 7D",
+            "description": "Trips (null if unknown, e.g. before the station opened)"
+          },
+          "arrivals_same_hour_4w": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Arrivals Same Hour 4W",
+            "description": "Trips (null if unknown, e.g. before the station opened)"
+          },
+          "arrivals_mean_7d": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Arrivals Mean 7D",
+            "description": "Trips (null if unknown, e.g. before the station opened)"
+          },
+          "weekday": {
+            "type": "integer",
+            "maximum": 6.0,
+            "minimum": 0.0,
+            "title": "Weekday",
+            "description": "Day of the week of hour_start, Monday = 0"
+          },
+          "hour_sin": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": -1.0,
+            "title": "Hour Sin"
+          },
+          "hour_cos": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": -1.0,
+            "title": "Hour Cos"
+          },
+          "month_sin": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": -1.0,
+            "title": "Month Sin"
+          },
+          "month_cos": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": -1.0,
+            "title": "Month Cos"
+          },
+          "latitude": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 20.9,
+                "minimum": 20.5
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latitude"
+          },
+          "longitude": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": -103.1,
+                "minimum": -103.6
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Longitude"
+          },
+          "capacity": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capacity",
+            "description": "Docks of the station"
+          },
+          "pc1": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pc1",
+            "description": "Weekly profile score (station_profiles)"
+          },
+          "pc2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pc2",
+            "description": "Weekly profile score (station_profiles)"
+          },
+          "pc3": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pc3",
+            "description": "Weekly profile score (station_profiles)"
+          },
+          "pc4": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pc4",
+            "description": "Weekly profile score (station_profiles)"
+          },
+          "pc5": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pc5",
+            "description": "Weekly profile score (station_profiles)"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "station_id",
+          "hour_start",
+          "departures_lag_2d",
+          "departures_lag_7d",
+          "departures_same_hour_4w",
+          "departures_mean_7d",
+          "arrivals_lag_2d",
+          "arrivals_lag_7d",
+          "arrivals_same_hour_4w",
+          "arrivals_mean_7d",
+          "weekday",
+          "hour_sin",
+          "hour_cos",
+          "month_sin",
+          "month_cos",
+          "latitude",
+          "longitude",
+          "capacity"
+        ],
+        "title": "FeatureRow",
+        "description": "The features of one station-hour, as ``features.forecast_rows`` builds them."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "unavailable"
+            ],
+            "title": "Status"
+          },
+          "models_loaded": {
+            "type": "boolean",
+            "title": "Models Loaded"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "Where the models load from: local or registry"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "models_loaded",
+          "source"
+        ],
+        "title": "HealthResponse"
+      },
+      "ModelCard": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "exported_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exported At",
+            "description": "When modeling.export wrote the folder"
+          },
+          "git_commit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Git Commit",
+            "description": "Commit of the export"
+          },
+          "models": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ModelCardEntry"
+            },
+            "type": "object",
+            "title": "Models"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "models"
+        ],
+        "title": "ModelCard"
+      },
+      "ModelCardEntry": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "alias": {
+            "type": "string",
+            "title": "Alias"
+          },
+          "uri": {
+            "type": "string",
+            "title": "Uri",
+            "description": "Versioned model URI, e.g. models:/mibici-departures/1"
+          },
+          "run_id": {
+            "type": "string",
+            "title": "Run Id",
+            "description": "MLflow run that logged the model"
+          },
+          "tags": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Tags",
+            "description": "Registry tags: metrics, digests, git commit..."
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "version",
+          "alias",
+          "uri",
+          "run_id",
+          "tags"
+        ],
+        "title": "ModelCardEntry"
+      },
+      "ModelInfo": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "alias": {
+            "type": "string",
+            "title": "Alias"
+          },
+          "uri": {
+            "type": "string",
+            "title": "Uri",
+            "description": "Versioned model URI, e.g. models:/mibici-departures/1"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "version",
+          "alias",
+          "uri"
+        ],
+        "title": "ModelInfo"
+      },
+      "PredictRequest": {
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/FeatureRow"
+            },
+            "type": "array",
+            "maxItems": 25000,
+            "minItems": 1,
+            "title": "Rows",
+            "description": "Station-hours to forecast, 1 to 25,000"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rows"
+        ],
+        "title": "PredictRequest"
+      },
+      "PredictResponse": {
+        "properties": {
+          "predictions": {
+            "items": {
+              "$ref": "#/components/schemas/Prediction"
+            },
+            "type": "array",
+            "title": "Predictions"
+          },
+          "models": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ModelInfo"
+            },
+            "type": "object",
+            "title": "Models",
+            "description": "The model version of each target"
+          }
+        },
+        "type": "object",
+        "required": [
+          "predictions",
+          "models"
+        ],
+        "title": "PredictResponse"
+      },
+      "Prediction": {
+        "properties": {
+          "station_id": {
+            "type": "integer",
+            "title": "Station Id"
+          },
+          "hour_start": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Hour Start"
+          },
+          "departures": {
+            "type": "number",
+            "title": "Departures",
+            "description": "Expected departures in the hour"
+          },
+          "arrivals": {
+            "type": "number",
+            "title": "Arrivals",
+            "description": "Expected arrivals in the hour"
+          },
+          "net_flow": {
+            "type": "number",
+            "title": "Net Flow",
+            "description": "arrivals - departures: < 0 empties the station"
+          }
+        },
+        "type": "object",
+        "required": [
+          "station_id",
+          "hour_start",
+          "departures",
+          "arrivals",
+          "net_flow"
+        ],
+        "title": "Prediction"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}
