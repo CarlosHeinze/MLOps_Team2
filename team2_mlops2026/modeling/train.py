@@ -12,6 +12,10 @@ data/processed/mibici/features/ -> one MLflow run per model and target
 - Every run logs the feature and profile tables as input datasets, with the digests of the steps
   that wrote them, plus the model's params, the segment metrics, the fit time, the model size
   and the fitted model.
+- The logged model declares what it needs to load in a clean environment: the pinned packages
+  of ``requirements-serving.txt`` except the web service's (``model_requirements``), and a copy
+  of this package (``code_paths``), since every pipeline holds classes of
+  ``team2_mlops2026.modeling.models``.
 - ``tune`` searches the hyperparameters of the finalists inside the training split
   (``modeling.tuning``).
 - ``backtest`` refits the baselines and the tuned finalists on 12 monthly rolling-origin folds,
@@ -35,6 +39,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from itertools import product
 from pathlib import Path
+import re
 import time
 from typing import Annotated
 import warnings
@@ -46,6 +51,8 @@ from sklearn.base import BaseEstimator
 from sklearn.pipeline import Pipeline
 import typer
 
+import team2_mlops2026
+from team2_mlops2026.config import PROJ_ROOT
 from team2_mlops2026.features import (
     FEATURES_DIR,
     FEATURES_FILE,
@@ -64,6 +71,9 @@ INPUT_EXAMPLE_ROWS = 5
 # 1.05: each later component adds 3% of the variance or less, and only PC1-PC5 are stable
 # from a station's first four weeks
 PROFILE_COMPONENTS = 5
+SERVING_REQUIREMENTS = PROJ_ROOT / "requirements-serving.txt"
+WEB_PACKAGES = ("fastapi", "pydantic", "uvicorn")  # the service's, not the model's
+PACKAGE_DIR = Path(team2_mlops2026.__file__).parent
 
 app = typer.Typer()
 
@@ -199,9 +209,24 @@ def log_inputs(src: Path) -> None:
     tracking.log_files_dataset([src / PROFILES_FILE], src, "mibici_station_profiles", "profiles")
 
 
+def model_requirements(path: str | Path = SERVING_REQUIREMENTS) -> list[str]:
+    """The pins of ``requirements-serving.txt`` that a logged model needs to load: all of them
+    but the web service's (``WEB_PACKAGES``)."""
+    pins = [line.split("#")[0].strip() for line in Path(path).read_text().splitlines()]
+    return [
+        pin
+        for pin in pins
+        if pin and re.split(r"[=<>!~\[; ]", pin, maxsplit=1)[0].lower() not in WEB_PACKAGES
+    ]
+
+
 def log_model(estimator: BaseEstimator, example: pd.DataFrame) -> None:
-    """Logs ``estimator`` as the active run's model, with a signature and an input example, and
-    the size of its skops file as ``model_size_mb``."""
+    """Logs ``estimator`` as the active run's model, with a signature, an input example, its
+    pinned requirements and a copy of this package, and the size of its skops file as
+    ``model_size_mb``.
+
+    With the requirements given, MLflow does not infer them (it would load the model in a
+    subprocess, ~6 s per model on Windows)."""
     import mlflow
     from mlflow.models import infer_signature
     import mlflow.sklearn
@@ -217,6 +242,8 @@ def log_model(estimator: BaseEstimator, example: pd.DataFrame) -> None:
         signature=signature,
         input_example=example,
         skops_trusted_types=TRUSTED_TYPES,
+        pip_requirements=model_requirements(),
+        code_paths=[str(PACKAGE_DIR)],
     )
 
 
