@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Fase 2 · Equipo 02 · MiBici</title>
+<style>
+  @page { size: Letter; margin: 15mm 16mm 17mm 16mm; }
+  :root {
+    --ink: #1b2733; --muted: #5b6875; --accent: #0e6f68; --accent-soft: #e7f2f0;
+    --rule: #d5dfdd; --head: #15324d; --warn: #8a5a00; --warn-soft: #fbf3e2;
+  }
+  * { box-sizing: border-box; }
+  html, body { background: #fff; }
+  body { margin: 0; color: var(--ink); font: 9.4pt/1.45 "Avenir Next", "Helvetica Neue", Arial, sans-serif; }
+  a { color: var(--accent); text-decoration: none; }
+  p { margin: 0 0 6pt; }
+  ul { margin: 0 0 6pt; padding-left: 14pt; }
+  li { margin-bottom: 2pt; }
+  b, strong { font-weight: 600; color: var(--head); }
+  code { font: 8.3pt Menlo, Consolas, monospace; background: #f1f4f4; padding: 0 2pt; border-radius: 2pt; }
+
+  .kicker { font-size: 8pt; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+  h1 { font-size: 21pt; line-height: 1.15; color: var(--head); margin: 4pt 0 4pt; font-weight: 700; }
+  .subtitle { font-size: 11pt; color: var(--muted); margin-bottom: 8pt; }
+  .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 2pt 18pt; font-size: 8.6pt; color: var(--muted);
+          border-top: 2pt solid var(--accent); border-bottom: 1px solid var(--rule); padding: 6pt 0; margin-bottom: 10pt; }
+  .meta b { color: var(--ink); font-weight: 600; }
+  .team { display: grid; grid-template-columns: max-content max-content; gap: 0 14pt; margin-top: 1pt; color: var(--ink); }
+  .team span:nth-child(even) { font-variant-numeric: tabular-nums; color: var(--muted); }
+
+  h2 { font-size: 13pt; color: var(--head); margin: 14pt 0 6pt; padding-bottom: 3pt; border-bottom: 1px solid var(--rule);
+       break-after: avoid; }
+  h2 .n { color: var(--accent); margin-right: 4pt; }
+  h3 { font-size: 10pt; color: var(--head); margin: 9pt 0 3pt; break-after: avoid; }
+  .page-break { break-before: page; }
+
+  .summary { background: var(--accent-soft); border-left: 3pt solid var(--accent); padding: 8pt 10pt; margin: 0 0 8pt; }
+  .summary p:last-child { margin: 0; }
+  .keyfigs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6pt; margin: 6pt 0 2pt; }
+  .keyfigs div { background: #fff; border: 1px solid var(--rule); border-radius: 3pt; padding: 5pt 7pt; font-size: 8.3pt; color: var(--muted); }
+  .keyfigs b { display: block; font-size: 12.5pt; color: var(--head); }
+  .criterion { border: 1px solid var(--accent); border-radius: 3pt; padding: 5pt 8pt; margin: 4pt 0 8pt; background: #fbfdfc; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 8.4pt; margin: 4pt 0 8pt; break-inside: avoid; }
+  table.flowing { break-inside: auto; }
+  tr { break-inside: avoid; }
+  th { text-align: left; background: #e9f0ef; color: var(--head); font-weight: 600; padding: 4pt 5pt; border-bottom: 1px solid #b9c9c6; }
+  td { padding: 3.5pt 5pt; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tr.pick td { background: #f1f8f6; font-weight: 600; }
+  tr.base td { color: var(--muted); }
+  .mono { font: 7.3pt Menlo, Consolas, monospace; }
+  .mono.run { font-size: 7pt; white-space: nowrap; }
+
+  figure { margin: 6pt 0 9pt; break-inside: avoid; }
+  figure img { width: 100%; display: block; border: 1px solid var(--rule); }
+  figcaption { font-size: 7.9pt; color: var(--muted); margin-top: 3pt; }
+  figure.w80 img, figure.w80 figcaption { width: 82%; margin-left: auto; margin-right: auto; }
+  figure.w65 img, figure.w65 figcaption { width: 65%; margin-left: auto; margin-right: auto; }
+  figure.w60 img, figure.w60 figcaption { width: 60%; margin-left: auto; margin-right: auto; }
+  figure.w80 figcaption, figure.w65 figcaption { margin-top: 3pt; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10pt; align-items: start; }
+
+  /* flow diagrams */
+  .flow { display: flex; align-items: stretch; gap: 0; margin: 6pt 0 8pt; break-inside: avoid; }
+  .flow .st { flex: 1; border: 1px solid #b9c9c6; border-radius: 3pt; padding: 4pt 5pt; font-size: 7.6pt; line-height: 1.3; background: #fbfdfc; }
+  .flow .st b { display: block; font-size: 8pt; }
+  .flow .st .d { font: 7pt Menlo, Consolas, monospace; color: var(--accent); }
+  .flow .ar { align-self: center; color: var(--accent); font-size: 11pt; padding: 0 2pt; }
+
+  .note { font-size: 8pt; color: var(--muted); }
+  .refs { font-size: 8pt; color: var(--muted); }
+  .refs p { margin-bottom: 3pt; padding-left: 12pt; text-indent: -12pt; }
+</style>
+</head>
+<body>
+
+<div class="kicker">Tecnológico de Monterrey · Maestría en Inteligencia Artificial Aplicada · TC5044.10 Operaciones de Aprendizaje Automático</div>
+<h1>MiBici: del baseline al modelo campeón en el MLflow Model Registry</h1>
+<div class="subtitle">Fase 2 · Construcción, ajuste, evaluación y registro de modelos · Equipo 02</div>
+<div class="meta">
+  <div>
+    <b>Integrantes</b>
+    <div class="team">
+      <span>Javier Ramírez</span><span>A01797453</span>
+      <span>Carlos Antonio Heinze Mortera</span><span>A01700179</span>
+      <span>Julián Malo Romero</span><span>A01797459</span>
+      <span>Carlos Arturo Chavero Cruz</span><span>A01797583</span>
+    </div>
+  </div>
+  <div>
+    <div><b>Fecha:</b> 8 de noviembre de 2026</div>
+    <div><b>Repositorio:</b> <a href="https://github.com/CarlosHeinze/MLOps_Team2">github.com/CarlosHeinze/MLOps_Team2</a></div>
+    <div><b>Video (5 min):</b> <a style="word-break: break-all" href="https://drive.google.com/drive/folders/1LHnPZmof9fXyMnF7oXyBgM6SJb7Wyb-V?usp=sharing">https://drive.google.com/drive/folders/1LHnPZmof9fXyMnF7oXyBgM6SJb7Wyb-V?usp=sharing</a></div>
+    <div><b>Datos:</b> <a href="https://mibici.net/es/datos-abiertos/">mibici.net/es/datos-abiertos</a>, dic 2014 – sep 2026</div>
+  </div>
+</div>
+
+<div class="summary">
+  <p><b>Resumen ejecutivo.</b> Cada noche, el equipo de redistribución de MiBici necesita saber qué estaciones se vaciarán o se llenarán al día siguiente. En la Fase 1 dejamos lista una tabla estación‑hora trazable; en esta fase construimos el modelo que la usa. Entrenamos dos baselines y cinco modelos con pérdida de conteo, ajustamos los hiperparámetros de los dos finalistas con validación temporal y los evaluamos con un backtest de origen móvil de 12 meses. <b>El campeón, LightGBM con pérdida Tweedie, reduce el WAPE en horas pico 15.4 % (salidas) y 15.1 % (llegadas) frente al mejor baseline, sin empeorar ningún grupo de estaciones</b>, así que cumple el criterio de éxito que fijamos en el ML Canvas antes de entrenar. Quedó en el MLflow Model Registry con el alias <code>champion</code>, y un proceso batch lo carga por ese alias para pronosticar las 24 horas siguientes de cada estación activa.</p>
+  <div class="keyfigs">
+    <div><b>−15.4 % / −15.1 %</b>WAPE en hora pico frente al mejor baseline (salidas / llegadas)</div>
+    <div><b>7 modelos</b>comparados en MLflow: 2 baselines y 5 candidatos</div>
+    <div><b>84 configuraciones</b>en el ajuste de hiperparámetros (2 finalistas × 2 objetivos × 21)</div>
+    <div><b>12 meses</b>de backtest con origen móvil, 48 runs anidados por fold</div>
+    <div><b>0.69</b>de precisión al anticipar estaciones desbalanceadas (0.57 el baseline)</div>
+    <div><b>11,232 pronósticos</b>por noche (468 estaciones × 24 h) en ~10 s</div>
+  </div>
+  <p class="note" style="margin-top:5pt">Todas las cifras provienen de los 195 runs del experimento <code>mibici</code> en MLflow y de los notebooks 2.01–2.05. Reprodujimos el entrenamiento y el ajuste en un segundo equipo: los baselines y <code>lgbm_tweedie</code> dan resultados idénticos, y <code>hgb_poisson</code> difiere en la tercera decimal por el no determinismo del hardware.</p>
+</div>
+
+<h2><span class="n">1</span>Del ML Canvas a la tarea de modelado</h2>
+<p>El ML Canvas de la Fase 1 fijó la tarea y la forma de evaluarla antes de entrenar. Un modelo global por objetivo (salidas y llegadas) pronostica la demanda de cada estación‑hora con la información disponible la noche anterior: todos los rezagos están al menos 48 h atrás. El entrenamiento usa de 2023‑01 a 2025‑09 (8.6 millones de filas estación‑hora) y la prueba de 2025‑10 a 2026‑09; los meses de prueba nunca se usan para elegir hiperparámetros.</p>
+<table class="flowing">
+  <tr><th style="width:38%">Métrica (Canvas §4)</th><th>Para qué la usamos</th></tr>
+  <tr><td><b>WAPE</b> (error absoluto total / demanda total), global y en horas pico (7–9 y 17–19 h entre semana)</td><td>Error relativo comparable entre estaciones. Las horas pico son las que deciden la redistribución, así que el criterio de éxito se mide ahí.</td></tr>
+  <tr><td><b>MAE</b> y RMSE</td><td>Error en viajes por estación‑hora, la unidad con la que razona el operador.</td></tr>
+  <tr><td><b>Devianza de Poisson</b></td><td>Calidad del pronóstico de un conteo disperso (el 54.6 % de las estación‑horas no tiene salidas). Es el objetivo del ajuste.</td></tr>
+  <tr><td><b>WAPE diario por grupo de demanda</b> (quintiles de estaciones)</td><td>Equidad: el modelo no debe sacrificar las estaciones tranquilas. Se mide sobre los totales diarios porque, en el grupo más tranquilo, un pronóstico de cero gana con el WAPE horario.</td></tr>
+  <tr><td><b>Precisión y recall</b> de estación‑días con |flujo neto| &gt; 50 % de la capacidad</td><td>Métrica de decisión: ¿el pronóstico señala las estaciones que el equipo tendrá que atender?</td></tr>
+</table>
+<div class="criterion"><b>Criterio de éxito.</b> WAPE en horas pico al menos 10 % menor que el del mejor baseline, sin ningún grupo de demanda peor que ese baseline.</div>
+
+<h2><span class="n">2</span>Estructura Cookiecutter y refactorización</h2>
+<p>El código de la fase vive en el paquete <code>team2_mlops2026</code>, con la estructura de Cookiecutter Data Science de la Fase 1. Los notebooks 2.01–2.05 importan sus funciones y solo explican cada decisión, con una sección «Result → action» después de cada resultado.</p>
+<table class="flowing">
+  <tr><th style="width:34%">Módulo</th><th>Responsabilidad</th><th style="width:10%">Issue</th></tr>
+  <tr><td class="mono">modeling/evaluate.py</td><td>Métricas, segmentos, métrica de decisión, folds de origen móvil y criterio de éxito</td><td>#22</td></tr>
+  <tr><td class="mono">modeling/models.py</td><td>Catálogo de modelos: baselines como estimadores de scikit‑learn y candidatos como <code>Pipeline</code></td><td>#23, #24</td></tr>
+  <tr><td class="mono">modeling/train.py</td><td>CLI <code>fit</code>, <code>tune</code>, <code>backtest</code> y <code>ablation</code>; entrenamiento registrado en MLflow</td><td>#23–#26</td></tr>
+  <tr><td class="mono">modeling/tuning.py</td><td>Búsqueda aleatoria con validación temporal y runs anidados</td><td>#25</td></tr>
+  <tr><td class="mono">modeling/backtest.py</td><td>Backtest de 12 folds, ablación de PCA y ranking de candidatos</td><td>#26</td></tr>
+  <tr><td class="mono">modeling/registry.py</td><td>Registro de <code>champion</code> y <code>challenger</code> con descripción y metadatos</td><td>#27</td></tr>
+  <tr><td class="mono">modeling/predict.py · features.forecast_rows</td><td>Pronóstico batch del día siguiente con los modelos del Registry</td><td>#27</td></tr>
+  <tr><td class="mono">tracking.py · plots.py</td><td>Runs, digests de datasets y búsqueda del último run; gráficas que se registran como artefactos</td><td>#23–#27</td></tr>
+</table>
+<p><b>Sin valores fijos en el código.</b> Los parámetros del protocolo son constantes con nombre al inicio de cada módulo (<code>TEST_START = "2025-10"</code>, <code>N_FOLDS = 12</code>, <code>MIN_IMPROVEMENT = 0.10</code>, <code>PEAK_HOURS</code>, <code>SEED</code>). Las CLIs exponen los que cambian entre corridas: <code>--model</code>, <code>--target</code>, <code>--n-trials</code>, <code>--n-folds</code>, <code>--first-test-month</code>, <code>--start</code>, <code>--alias</code> y <code>--no-track</code>.</p>
+<p><b>Clases donde aportan.</b> <code>SeasonalNaive</code> e <code>HistoricalAverage</code> son estimadores de scikit‑learn (<code>BaseEstimator</code>, <code>RegressorMixin</code>), así que los baselines se entrenan, evalúan, registran y cargan igual que los modelos de ML. <code>ModelSpec</code> describe cada modelo con su constructor, sus parámetros por defecto y su espacio de búsqueda. <code>NonNegative</code> envuelve un regresor para recortar pronósticos negativos. <code>BacktestResult</code>, <code>Entry</code> y <code>Forecast</code> agrupan el resultado de un backtest, de una versión registrada y de un pronóstico.</p>
+<p><b>Calidad.</b> 250 pruebas automáticas con datos sintéticos (87 nuevas en esta fase) y lint con ruff sin hallazgos. Una prueba de linaje comprueba que un run de modelo lee exactamente las tablas que escribieron las etapas de variables.</p>
+
+<h2><span class="n">3</span>Pipeline de scikit‑learn</h2>
+<p>Cada candidato es un <code>Pipeline</code> de dos pasos: el preprocesador de la Fase 1 (<code>ColumnTransformer</code>) y el regresor. El pipeline completo se ajusta solo con las filas de entrenamiento, se guarda como un único artefacto (formato skops), se registra y es el mismo objeto que carga el proceso batch. Así, el pronóstico aplica exactamente las transformaciones del entrenamiento.</p>
+<table>
+  <tr><th style="width:42%">Columnas de entrada</th><th>Transformación dentro del pipeline</th></tr>
+  <tr><td>Estación (<code>station_id</code>)</td><td>Target encoding con validación cruzada (KFold 5), para que una fila no vea su propio objetivo</td></tr>
+  <tr><td>Día de la semana</td><td>One‑hot</td></tr>
+  <tr><td>Hora y mes en seno / coseno</td><td>Sin cambio</td></tr>
+  <tr><td>Demanda pasada de salidas y llegadas: 2 y 7 días antes, media de la misma hora en 4 semanas y nivel de 7 días</td><td>Imputación por mediana, log1p y <code>StandardScaler</code></td></tr>
+  <tr><td>Latitud, longitud y capacidad</td><td>Imputación por mediana y <code>StandardScaler</code></td></tr>
+  <tr><td>Perfil semanal de la estación (PCA, <code>pc1</code>–<code>pc5</code>)</td><td>Imputación con 0 (el perfil promedio), <code>StandardScaler</code> y un indicador de «sin perfil»</td></tr>
+</table>
+<div class="flow">
+  <div class="st"><b>Variables</b>tabla estación‑hora y perfiles<div class="d">features 636e7329</div></div><div class="ar">→</div>
+  <div class="st"><b>Pipeline</b>preprocesador + regresor<div class="d">models.py</div></div><div class="ar">→</div>
+  <div class="st"><b>Entrenar y evaluar</b>fit · tune · backtest<div class="d">train.py</div></div><div class="ar">→</div>
+  <div class="st"><b>MLflow</b>runs, métricas, artefactos<div class="d">experimento mibici</div></div><div class="ar">→</div>
+  <div class="st"><b>Model Registry</b>alias champion<div class="d">registry.py</div></div><div class="ar">→</div>
+  <div class="st"><b>Pronóstico</b>24 h por estación<div class="d">predict.py</div></div>
+</div>
+<p><code>make pipeline</code> encadena las etapas: <code>features</code> → <code>train</code> → <code>tune</code> → <code>evaluate</code> → <code>register</code> → <code>predict</code>. En una MacBook Pro con i9 de 8 núcleos tardan ~10 min, ~75 min, ~3 h 10 min, menos de 1 min y ~10 s.</p>
+
+<h2><span class="n">4</span>Construcción, ajuste y evaluación de modelos</h2>
+<h3>4.1 Selección de algoritmos</h3>
+<p>La demanda es un conteo disperso con interacciones fuertes entre estación, hora y día, y las ~480 estaciones comparten patrones. Por eso elegimos <b>modelos globales con pérdida de conteo</b>, uno por objetivo para todas las estaciones, comparados contra dos reglas simples.</p>
+<table class="flowing">
+  <tr><th style="width:20%">Modelo</th><th style="width:10%">Familia</th><th>Por qué está</th></tr>
+  <tr class="base"><td class="mono">seasonal_naive</td><td>baseline</td><td>La demanda de la misma estación y hora una semana antes.</td></tr>
+  <tr class="base"><td class="mono">historical_average</td><td>baseline</td><td>El promedio por estación, día de la semana y hora del periodo de entrenamiento.</td></tr>
+  <tr><td class="mono">poisson_glm</td><td>GLM</td><td>La pérdida de conteo en su forma más simple e interpretable; mide cuánto aportan los modelos no lineales.</td></tr>
+  <tr><td class="mono">hgb_poisson</td><td>boosting</td><td>Gradient boosting de scikit‑learn con pérdida Poisson: aprende las interacciones sin dependencias nuevas.</td></tr>
+  <tr><td class="mono">lgbm_poisson</td><td>boosting</td><td>LightGBM con objetivo Poisson: rápido sobre millones de filas y con más opciones de regularización.</td></tr>
+  <tr><td class="mono">lgbm_tweedie</td><td>boosting</td><td>LightGBM con objetivo Tweedie: admite más varianza que Poisson, útil en estaciones con demanda en ráfagas.</td></tr>
+  <tr><td class="mono">hgb_squared_error</td><td>boosting</td><td>El mismo boosting con error cuadrático: el contraste que mide qué aporta la pérdida de conteo.</td></tr>
+</table>
+<p class="note">Descartamos los modelos por estación (ARIMA, Prophet), que serían ~970 series sin aprender entre estaciones e inviables para las estaciones nuevas; las redes secuenciales, que cuestan más de ajustar sin aportar información que no den ya los rezagos y el calendario; y XGBoost, que ofrece los mismos objetivos que LightGBM.</p>
+
+<h3>4.2 Entrenamiento y comparación con los baselines</h3>
+<table>
+  <tr><th>Modelo (parámetros por defecto)</th><th class="num">WAPE pico<br>salidas</th><th class="num">WAPE pico<br>llegadas</th><th class="num">WAPE global<br>salidas</th><th class="num">WAPE diario<br>grupo 1 (salidas)</th><th>Criterio de éxito</th></tr>
+  <tr class="base"><td class="mono">seasonal_naive</td><td class="num">0.649</td><td class="num">0.600</td><td class="num">0.749</td><td class="num">0.411</td><td>mejor baseline en hora pico</td></tr>
+  <tr class="base"><td class="mono">historical_average</td><td class="num">0.657</td><td class="num">0.613</td><td class="num">0.716</td><td class="num">0.387</td><td>—</td></tr>
+  <tr><td class="mono">poisson_glm</td><td class="num">0.557</td><td class="num">0.529</td><td class="num">0.698</td><td class="num">0.572</td><td>no: grupos 1 y 5 peores</td></tr>
+  <tr><td class="mono">hgb_poisson</td><td class="num">0.526</td><td class="num">0.504</td><td class="num">0.622</td><td class="num">0.322</td><td>cumple</td></tr>
+  <tr><td class="mono">hgb_squared_error</td><td class="num">0.528</td><td class="num">0.494</td><td class="num">0.626</td><td class="num">0.351</td><td>cumple</td></tr>
+  <tr><td class="mono">lgbm_poisson</td><td class="num">0.530</td><td class="num">0.504</td><td class="num">0.631</td><td class="num">0.344</td><td>cumple</td></tr>
+  <tr><td class="mono">lgbm_tweedie</td><td class="num">0.528</td><td class="num">0.492</td><td class="num">0.621</td><td class="num">0.321</td><td>cumple</td></tr>
+</table>
+<p class="note">Tabla 1. Split de prueba 2025‑10 a 2026‑09 (notebook 2.02, runs <code>train-&lt;modelo&gt;-&lt;objetivo&gt;</code>).</p>
+<p><b>El problema del baseline.</b> La primera versión de los modelos (commit <code>233af81</code>) superaba al baseline en salidas, pero no en llegadas. Al revisar por qué encontramos dos fallas en el procesamiento y en la medición, no en el algoritmo:</p>
+<ul>
+  <li><b>La métrica premiaba pronosticar cero.</b> En el grupo de estaciones más tranquilas (≈0.2 viajes por hora), el WAPE horario de un pronóstico de cero es 1.000, menor que el de cualquier modelo (1.20–1.39).</li>
+  <li><b>Las estaciones nuevas parecían vacías.</b> Cada estación tenía un único perfil PCA calculado antes de 2025‑10, así que las 102 estaciones abiertas después llevaban la marca «sin perfil», que el modelo había aprendido como «sin demanda»: pronosticaba 0.003 viajes por hora donde había 0.28.</li>
+</ul>
+<p>Cambiamos el procesamiento: los perfiles PCA se recalculan cada semana con las últimas cuatro semanas de la estación, agregamos un nivel de demanda de 7 días y los grupos se comparan con el WAPE diario. Con eso, los cuatro modelos de boosting cumplen el criterio en ambos objetivos. <b>Pasan al ajuste <code>lgbm_tweedie</code> y <code>hgb_poisson</code></b>, los mejores en hora pico y en el grupo 1. <code>hgb_squared_error</code> compite en WAPE, pero pronostica demanda negativa en el 5.7 % de las horas y es peor en las estaciones tranquilas (0.351 contra 0.322).</p>
+<figure class="w65"><img src="figures/fase2/mlflow-compare-models.png" alt="Comparación de modelos en MLflow"><figcaption>Figura 1. Comparación en MLflow (vista Chart) de los 7 runs <code>train-&lt;modelo&gt;-departures</code>: WAPE global y en horas pico del split de prueba. Verde oscuro: <code>lgbm_tweedie</code>; rojo y verde claro: los baselines.</figcaption></figure>
+
+<h3>4.3 Ajuste de hiperparámetros</h3>
+<p>Para cada finalista y objetivo, una búsqueda aleatoria de 20 configuraciones más los valores por defecto, validada dentro del periodo de entrenamiento. Los 12 meses previos a la prueba (2024‑10 a 2025‑09) forman tres folds: cada uno valida un mes (julio, agosto o septiembre de 2025), entrena con un tercio de las horas anteriores y aplica early stopping en los 14 días previos al mes. El objetivo es la devianza de Poisson media. Cada configuración es un run anidado en <code>tune-&lt;modelo&gt;-&lt;objetivo&gt;</code>; el run padre guarda los mejores parámetros y el modelo reentrenado con todo el entrenamiento. Elegimos búsqueda aleatoria (Bergstra y Bengio, 2012) para no agregar dependencias; con 13–24 minutos por búsqueda en una laptop, 20 puntos bastan para ubicar la región buena.</p>
+<table>
+  <tr><th>Finalista</th><th>Objetivo</th><th class="num">Devianza de validación<br>por defecto</th><th class="num">Ajustada</th><th class="num">Mejora</th><th>Mejor configuración</th></tr>
+  <tr><td class="mono">lgbm_tweedie</td><td>salidas</td><td class="num">0.9037</td><td class="num">0.8902</td><td class="num">−1.5 %</td><td>593 árboles, tasa 0.026, 230 hojas, potencia 1.32</td></tr>
+  <tr><td class="mono">lgbm_tweedie</td><td>llegadas</td><td class="num">0.8769</td><td class="num">0.8653</td><td class="num">−1.3 %</td><td>269 árboles, tasa 0.079, 165 hojas, potencia 1.26</td></tr>
+  <tr><td class="mono">hgb_poisson</td><td>salidas</td><td class="num">0.9019</td><td class="num">0.8881</td><td class="num">−1.5 %</td><td>475 iteraciones, tasa 0.043, 123 hojas</td></tr>
+  <tr><td class="mono">hgb_poisson</td><td>llegadas</td><td class="num">0.8759</td><td class="num">0.8626</td><td class="num">−1.5 %</td><td>343 iteraciones, tasa 0.126, 53 hojas</td></tr>
+</table>
+<p><b>Lo que aprendimos.</b> El número de iteraciones es lo que más pesa: los valores por defecto (100 iteraciones) quedan entre los peores. La mejora total es modesta, 1.3–1.5 % en la devianza y cerca de 1 % en el WAPE en hora pico. Los cambios de variables de la sección 4.2 pesaron mucho más que los hiperparámetros.</p>
+<figure class="w60"><img src="figures/fase2/mlflow-tuning-parallel.png" alt="Coordenadas paralelas del ajuste"><figcaption>Figura 2. Coordenadas paralelas en MLflow de los 21 runs anidados de <code>tune-lgbm_tweedie-departures</code>, coloreados por la devianza de validación (azul = mejor). Las mejores configuraciones combinan más iteraciones con una potencia Tweedie menor a 1.5.</figcaption></figure>
+
+<h3>4.4 Evaluación: backtest de origen móvil</h3>
+<p>El split de prueba entrena una sola vez y evalúa los 12 meses juntos. El Canvas pide simular la operación: entrenar hasta el mes <i>m</i>, pronosticar el mes <i>m</i> + 1 y avanzar un mes, como haría el reentrenamiento mensual. El backtest reentrena desde cero los dos baselines y los dos finalistas (con sus parámetros ajustados) en 12 folds, de 2025‑10 a 2026‑09, y aplica el criterio de éxito a la media de los folds.</p>
+<table>
+  <tr><th>Modelo</th><th class="num">WAPE pico salidas</th><th class="num">WAPE pico llegadas</th><th class="num">WAPE global<br>salidas</th><th class="num">WAPE diario<br>grupo 1</th><th class="num">Precisión /<br>recall decisión</th><th>Criterio</th></tr>
+  <tr class="base"><td class="mono">seasonal_naive</td><td class="num">0.653 ± 0.057</td><td class="num">0.603 ± 0.052</td><td class="num">0.753</td><td class="num">0.444</td><td class="num">0.48 / 0.48</td><td>—</td></tr>
+  <tr class="base"><td class="mono">historical_average</td><td class="num">0.614 ± 0.081</td><td class="num">0.569 ± 0.079</td><td class="num">0.679</td><td class="num">0.474</td><td class="num">0.57 / 0.45</td><td>mejor baseline</td></tr>
+  <tr class="pick"><td class="mono">lgbm_tweedie ✓</td><td class="num">0.520 ± 0.042</td><td class="num">0.483 ± 0.039</td><td class="num">0.611</td><td class="num">0.334</td><td class="num">0.69 / 0.43</td><td>cumple: −15.4 % / −15.1 %</td></tr>
+  <tr><td class="mono">hgb_poisson</td><td class="num">0.521 ± 0.043</td><td class="num">0.488 ± 0.038</td><td class="num">0.613</td><td class="num">0.335</td><td class="num">0.68 / 0.44</td><td>cumple: −15.2 % / −14.4 %</td></tr>
+</table>
+<p class="note">Tabla 2. Media ± desviación estándar de los 12 folds (notebook 2.04, runs <code>backtest-&lt;modelo&gt;</code>). WAPE global y del grupo 1 en salidas.</p>
+<div class="two">
+  <figure><img src="figures/fase2/2.04-peak-wape.png" alt="WAPE en hora pico"><figcaption>Figura 3. WAPE en hora pico, media de los 12 meses. Las líneas punteadas marcan el criterio de éxito: 10 % por debajo del mejor baseline (notebook 2.04).</figcaption></figure>
+  <figure><img src="figures/fase2/2.04-importance-departures.png" alt="Importancia por permutación"><figcaption>Figura 4. Importancia por permutación del campeón (salidas): la hora del día y la demanda reciente de la estación dominan; los perfiles PCA (<code>pc1</code>, <code>pc2</code>) aportan poco.</figcaption></figure>
+</div>
+<figure><img src="figures/fase2/mlflow-backtest-folds.png" alt="Backtest por fold en MLflow"><figcaption>Figura 5. Los cuatro runs <code>backtest-&lt;modelo&gt;</code> en MLflow, salidas: media y desviación estándar del WAPE en hora pico sobre los 12 folds, y el WAPE de cada fold registrado como paso (0 = 2025‑10, 11 = 2026‑09). Azul y magenta: los finalistas; rojo y verde: los baselines.</figcaption></figure>
+<p><b>Decisión: <code>lgbm_tweedie</code> es el campeón de ambos objetivos y <code>hgb_poisson</code> el challenger.</b> Los finalistas quedan a menos de 0.005 entre sí, muy por debajo de la variación entre meses (0.04). <code>lgbm_tweedie</code> gana por consistencia: cumple el criterio en 11 de 12 meses en salidas y en 10 de 12 en llegadas (<code>hgb_poisson</code>, en 7 de 12 en llegadas). Además, tarda 73 min en reentrenar los 12 folds, contra 96, y se equivoca menos de madrugada.</p>
+<ul>
+  <li><b>Meses débiles:</b> en septiembre de 2026, el mes de demanda récord (470 mil salidas, 25 % más que agosto), y en octubre de 2025 para llegadas, la mejora baja a 8.0–9.6 %: sigue superando al baseline, pero por debajo del 10 %. Diciembre y junio son los meses más difíciles para todos los modelos.</li>
+  <li><b>Estaciones nuevas:</b> las ~100 abiertas desde mayo de 2026 bajan de un WAPE diario de 0.77 en su primer mes a 0.30 en septiembre; los baselines empiezan en ~2 porque no tienen historia que repetir.</li>
+  <li><b>Métrica de decisión:</b> 7 de cada 10 estaciones que el campeón marca sí se desbalancean (0.57 con el baseline), pero detecta 43 % de ellas. Bajar el umbral de alerta (por ejemplo, 40 % de la capacidad) subiría el recall sin cambiar el modelo.</li>
+</ul>
+<p><b>¿Ayuda el PCA? (retroalimentación de la Fase 1).</b> Evaluamos cada finalista ajustado en el split de prueba con y sin las componentes del perfil (runs <code>ablation-*</code>, tag <code>experiment=pca_ablation</code>).</p>
+<table>
+  <tr><th>Finalista</th><th>Objetivo</th><th class="num">WAPE pico con PCA</th><th class="num">Sin PCA</th><th class="num">Cambio</th><th class="num">Devianza: cambio</th></tr>
+  <tr><td class="mono">lgbm_tweedie</td><td>salidas</td><td class="num">0.5198</td><td class="num">0.5227</td><td class="num">+0.56 %</td><td class="num">+0.32 %</td></tr>
+  <tr><td class="mono">lgbm_tweedie</td><td>llegadas</td><td class="num">0.4831</td><td class="num">0.4849</td><td class="num">+0.38 %</td><td class="num">+0.20 %</td></tr>
+  <tr><td class="mono">hgb_poisson</td><td>salidas</td><td class="num">0.5212</td><td class="num">0.5243</td><td class="num">+0.59 %</td><td class="num">+0.28 %</td></tr>
+  <tr><td class="mono">hgb_poisson</td><td>llegadas</td><td class="num">0.4961</td><td class="num">0.4972</td><td class="num">+0.22 %</td><td class="num">+0.25 %</td></tr>
+</table>
+<p>Quitar las componentes empeora los cuatro casos, pero poco: entre 0.2 y 0.6 %, mucho menos que la variación entre meses. <b>El PCA ayuda de forma consistente pero marginal</b>; la precisión viene de los rezagos de demanda y de la hora. Lo mantenemos porque cuesta cinco columnas calculadas una vez por semana. La alternativa, las 336 variables originales del perfil, ocuparía ~16 GB en la tabla de 12.2 millones de filas, así que la comparamos contra no usar perfil.</p>
+<figure class="w65"><img src="figures/fase2/2.04-stations-departures.png" alt="Pronóstico contra real"><figcaption>Figura 6. Salidas por hora en la semana del 7 de septiembre de 2026: la estación más activa, una mediana y la más activa de las abiertas desde mayo. El campeón (naranja) sigue los picos de la mañana y la tarde y los ceros de la noche, y suaviza los picos más altos (notebook 2.04).</figcaption></figure>
+
+<h2><span class="n">5</span>Seguimiento de experimentos, visualización y Model Registry</h2>
+<p>Todo el trabajo de la fase quedó en el experimento <code>mibici</code> del servidor de MLflow: 195 runs, nombrados por etapa para poder filtrarlos y compararlos. Cada run guarda el commit (<code>git_commit</code>) y los datasets de entrada con su digest.</p>
+<table class="flowing">
+  <tr><th style="width:27%">Run</th><th>Qué registra</th><th style="width:15%">Cuántos</th></tr>
+  <tr><td class="mono run">train-&lt;modelo&gt;-&lt;objetivo&gt;</td><td>Parámetros del regresor; métricas por segmento (WAPE, MAE, RMSE, devianza; horarias y diarias); tiempo de ajuste y tamaño; el pipeline completo en skops</td><td>14 por corrida</td></tr>
+  <tr><td class="mono run">tune-&lt;modelo&gt;-&lt;objetivo&gt;<br>└ trial-NN</td><td>Parámetros y métricas de validación de cada configuración, con cada fold como paso; el padre guarda la mejor, las métricas por defecto y el modelo reentrenado</td><td>4 padres<br>84 anidados</td></tr>
+  <tr><td class="mono run">backtest-&lt;modelo&gt;<br>└ fold-AAAA-MM</td><td>Métricas de cada fold y su media ± desviación; tablas de errores, pronósticos, importancia y figuras como artefactos</td><td>4 padres<br>48 anidados</td></tr>
+  <tr><td class="mono run">ablation-&lt;modelo&gt;-&lt;obj.&gt;-pca</td><td>Métricas de prueba con y sin perfiles PCA; de qué run de ajuste salieron los parámetros (<code>params_from</code>)</td><td>8</td></tr>
+  <tr><td class="mono run">predict-&lt;inicio&gt;</td><td>Versión de cada modelo usado, digests de entrada y el archivo de pronósticos como dataset</td><td>1 por noche</td></tr>
+</table>
+<p><b>Visualización.</b> Las comparaciones de este reporte se hicieron en la interfaz de MLflow: la vista Chart filtra los runs por nombre (<code>attributes.run_name LIKE 'backtest-%'</code>) y busca las métricas (<code>peak_wape</code>) para compararlas en barras (Figuras 1 y 5), y la vista Compare dibuja las coordenadas paralelas de los trials (Figura 2).</p>
+<p><b>Model Registry.</b> Registramos un modelo por objetivo, <code>mibici-departures</code> y <code>mibici-arrivals</code>. Cada versión es el modelo de su run de ajuste, así que enlaza a sus parámetros, métricas, datasets y artefactos. Además lleva una descripción y tags con lo que pide la rúbrica:</p>
+<ul>
+  <li><b>Versión e hiperparámetros:</b> el número de versión, el algoritmo y el run fuente, que guarda los hiperparámetros.</li>
+  <li><b>Métricas de evaluación:</b> las del split de prueba y la media ± desviación del backtest.</li>
+  <li><b>Resultados relevantes:</b> si cumple el criterio de éxito, contra qué baseline y por cuánto.</li>
+  <li><b>Trazabilidad:</b> la ventana de entrenamiento, los digests de las tablas y el commit del código.</li>
+</ul>
+<p>Los alias separan qué modelo se sirve de su número de versión: <code>champion</code> (v1, <code>lgbm_tweedie</code>) es el que carga el proceso batch y <code>challenger</code> (v2, <code>hgb_poisson</code>) queda para comparar o revertir. Promover otro modelo solo mueve el alias, sin cambiar código.</p>
+<figure><img src="figures/fase2/mlflow-registry-models.png" alt="Modelos registrados"><figcaption>Figura 7. Los dos modelos registrados, con sus versiones y alias.</figcaption></figure>
+<figure><img src="figures/fase2/mlflow-registry-version.png" alt="Versión campeona"><figcaption>Figura 8. La versión 1 de <code>mibici-departures</code>: alias <code>champion</code>, run fuente <code>tune-lgbm_tweedie-departures</code> y descripción con las métricas de prueba, del backtest y el resultado del criterio de éxito; abajo, sus tags.</figcaption></figure>
+<p><b>Pronóstico batch.</b> <code>predict.py</code> construye las filas de las 24 horas siguientes solo con el historial previo (rezagos de al menos 48 h), carga <code>models:/mibici-&lt;objetivo&gt;@champion</code> y escribe salidas, llegadas y flujo neto por estación‑hora. Repetimos la noche del 8 de septiembre de 2026 y la comparamos con lo que ocurrió el día 9:</p>
+<ul>
+  <li>WAPE en hora pico de 0.46 (salidas) y 0.42 (llegadas), y 3.6 % de error en el total del sistema.</li>
+  <li>Precisión de 0.86 al marcar estaciones desbalanceadas; las 10 estaciones con mayor riesgo pronosticado sí se desbalancearon.</li>
+</ul>
+<p>La corrida para el 1 de octubre de 2026 produjo 11,232 pronósticos (468 estaciones × 24 h) y señala 45 estaciones que superarán la mitad de su capacidad.</p>
+<figure class="w65"><img src="figures/fase2/2.05-night-departures.png" alt="Noche simulada"><figcaption>Figura 9. Salidas de todo el sistema el 9 de septiembre de 2026: lo real contra el pronóstico del campeón y del challenger cargados desde el Registry (notebook 2.05).</figcaption></figure>
+<p><b>Linaje.</b> El digest de la tabla de variables (<code>636e7329</code>) es el mismo en el run que la construyó, en los runs de modelo y en los tags de cada versión registrada. <code>tests/test_lineage.py</code> lo comprueba automáticamente.</p>
+
+<h2><span class="n">6</span>Roles, actividades e interacción</h2>
+<table>
+  <tr><th style="width:17%">Integrante</th><th style="width:13%">Rol MLOps</th><th>Actividades en la Fase 2</th><th style="width:22%">Entrega a</th></tr>
+  <tr><td>Carlos Antonio Heinze Mortera</td><td>ML Engineer</td><td>Planeó la fase en los issues #22–#29, con alcance y criterios de aceptación. Métricas y folds, baselines, modelos candidatos y ajuste de hiperparámetros (issues #22–#25; PR #30–#33). Rediseñó el procesamiento cuando la primera versión no superó al baseline.</td><td>Modelos ajustados en los runs <code>tune-*</code> → MLOps.</td></tr>
+  <tr><td>Javier Ramírez</td><td>MLOps Engineer</td><td>Reprodujo los notebooks 2.01–2.03 en un segundo equipo. Backtest de 12 meses y ablación de PCA, Model Registry, pronóstico batch, <code>Makefile</code> y prueba de linaje (issues #26–#28; PR #34–#36).</td><td>Campeón registrado y <code>make pipeline</code> → QA y documentación.</td></tr>
+  <tr><td>Julián Malo Romero</td><td>DevOps y documentación</td><td>Reporte ejecutivo y video de la fase (issue #29), y verificación de las cifras contra MLflow y los notebooks.</td><td>Entregable validado → profesor.</td></tr>
+  <tr><td>Carlos Arturo Chavero Cruz</td><td>QA y documentación</td><td>Reporte ejecutivo y video de la fase (issue #29).</td><td>Entregable → profesor.</td></tr>
+</table>
+<p><b>Cómo interactúan.</b> El flujo es el de la Fase 1: issue con alcance y criterios de aceptación → rama → pull request con descripción → revisión → <code>master</code>. Entre roles, el contrato no es verbal: es un artefacto que se puede comprobar en MLflow.</p>
+<ul>
+  <li>El backtest toma los parámetros del último run <code>tune-*</code> y guarda de cuál los tomó.</li>
+  <li>El registro comprueba que la ablación evaluó ese mismo modelo antes de usar sus métricas.</li>
+  <li>Cada versión registrada guarda el commit y los digests de sus datos.</li>
+</ul>
+<p>La reproducción en un segundo equipo sirvió como revisión cruzada: los baselines y <code>lgbm_tweedie</code> dieron números idénticos.</p>
+<div class="flow">
+  <div class="st"><b>Data Engineer</b>tablas de la Fase 1<div class="d">features · profiles</div></div><div class="ar">→</div>
+  <div class="st"><b>ML Engineer</b>candidatos y ajuste<div class="d">train-* · tune-*</div></div><div class="ar">→</div>
+  <div class="st"><b>MLOps Engineer</b>backtest, Registry, batch<div class="d">backtest-* · @champion</div></div><div class="ar">→</div>
+  <div class="st"><b>DevOps</b>entorno y Makefile<div class="d">make pipeline</div></div><div class="ar">→</div>
+  <div class="st"><b>QA y documentación</b>reporte y video<div class="d">MLflow · notebooks</div></div>
+</div>
+
+<h2><span class="n">7</span>Conclusiones y reflexión</h2>
+<p><b>Lo que funcionó.</b> Fijar las métricas y el criterio de éxito en el Canvas antes de entrenar nos obligó a medir contra una meta, no a elegir la métrica después; también nos dejó ver que el WAPE horario premiaba pronosticar cero. La validación temporal mantuvo los meses de prueba intactos hasta el backtest. Los alias del Registry separan el modelo que se sirve de su versión, y los digests convierten el linaje en algo que se comprueba.</p>
+<p><b>Lecciones.</b> Las variables pesaron más que el algoritmo y que los hiperparámetros. El nivel de 7 días y los perfiles semanales resolvieron las estaciones nuevas; el ajuste dio 1.3–1.5 % y el PCA 0.2–0.6 %.</p>
+<p><b>Áreas de mejora identificadas.</b></p>
+<ul>
+  <li><b>Correr las tareas largas en una VM o en un servidor en la nube.</b> Durante el ajuste, la laptop de Carlos se suspendió y un trial quedó en pausa ~13 h; el backtest toma ~3 h en una laptop.</li>
+  <li><b>Un servidor de MLflow compartido</b>, con base de datos y almacenamiento de artefactos remotos. Hoy el servidor de referencia corre en un equipo y se comparte reenviando su puerto.</li>
+  <li><b>Optuna</b> (búsqueda bayesiana con poda) en lugar de la búsqueda aleatoria, y <b>Polars</b> para construir la tabla de variables más rápido.</li>
+  <li>Pronósticos por intervalo o cuantiles para las horas pico, un umbral de alerta acordado con el operador para subir el recall, y fijar en cero las horas de madrugada, donde el WAPE se dispara porque casi no hay viajes.</li>
+</ul>
+<p><b>Siguiente fase.</b> Desplegar <code>predict.py</code> como tarea programada, monitorear cada mes el WAPE en hora pico y el drift de las estaciones nuevas, y reentrenar con <code>make train tune evaluate register</code>, moviendo el alias <code>champion</code> solo si el nuevo modelo cumple el criterio en el backtest.</p>
+
+<h2><span class="n">8</span>Declaración de uso de inteligencia artificial</h2>
+<p>El equipo utilizó las siguientes herramientas de IA. Todo el código se revisó y ejecutó, y todas las cifras de este documento provienen de ejecutar ese código sobre los datos reales; ningún resultado fue generado por la IA sin esa ejecución. La responsabilidad final del contenido es del equipo.</p>
+<ul>
+  <li>Anthropic. (2026). <i>Claude Code</i> (basado en Claude Opus 5.5) [Modelo de lenguaje grande], utilizado para generación y depuración de código y pruebas (backtest, Model Registry y pronóstico batch), ejecución y verificación de los notebooks, análisis de resultados, capturas de MLflow y redacción de documentación y de este documento. <a href="https://claude.com/claude-code">https://claude.com/claude-code</a></li>
+  <li>GitHub. (2026). <i>GitHub Copilot</i> [Asistente de programación basado en modelos de lenguaje], utilizado para la revisión automática de los pull requests #30, #31 y #33 y para resumir cambios en las descripciones de PR. <a href="https://github.com/features/copilot">https://github.com/features/copilot</a></li>
+</ul>
+
+<h2>Referencias</h2>
+<div class="refs">
+  <p>Bergstra, J. y Bengio, Y. (2012). Random search for hyper-parameter optimization. <i>Journal of Machine Learning Research</i>, 13, 281–305.</p>
+  <p>Dorard, L. (2015). <i>Machine Learning Canvas</i> (v1.2). OWNML. https://www.ownml.co/</p>
+  <p>DrivenData. (2024). <i>Cookiecutter Data Science</i> (v2). https://cookiecutter-data-science.drivendata.org/</p>
+  <p>Huyen, C. (2022). <i>Designing machine learning systems: An iterative process for production-ready applications</i>. O'Reilly Media.</p>
+  <p>Hyndman, R. J. y Athanasopoulos, G. (2021). <i>Forecasting: Principles and practice</i> (3.ª ed.). OTexts. https://otexts.com/fpp3/</p>
+  <p>Ke, G. et al. (2017). LightGBM: A highly efficient gradient boosting decision tree. <i>Advances in Neural Information Processing Systems</i>, 30.</p>
+  <p>MiBici. (2026). <i>Datos abiertos</i>. https://mibici.net/es/datos-abiertos/</p>
+  <p>MLflow Project. (2026). <i>MLflow Tracking</i> y <i>MLflow Model Registry</i>. https://mlflow.org/docs/latest/</p>
+  <p>Pedregosa, F. et al. (2011). Scikit-learn: Machine learning in Python. <i>Journal of Machine Learning Research</i>, 12, 2825–2830.</p>
+  <p>Treveil, M. et al. (2020). <i>Introducing MLOps: How to scale machine learning in the enterprise</i>. O'Reilly Media.</p>
+</div>
+
+</body>
+</html>
