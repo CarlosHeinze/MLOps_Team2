@@ -1,0 +1,39 @@
+{
+  "predictions": [
+    {
+      "station_id": 35,
+      "hour_start": "2026-09-09T08:00:00",
+      "departures": 9.061821614949976,
+      "arrivals": 16.17382743213058,
+      "net_flow": 7.112005817180604
+    },
+    {
+      "station_id": 51,
+      "hour_start": "2026-09-09T08:00:00",
+      "departures": 46.84400274438855,
+      "arrivals": 14.689625404127986,
+      "net_flow": -32.15437734026056
+    },
+    {
+      "station_id": 271,
+      "hour_start": "2026-09-09T08:00:00",
+      "departures": 18.93634807621048,
+      "arrivals": 14.13712699715718,
+      "net_flow": -4.799221079053298
+    }
+  ],
+  "models": {
+    "departures": {
+      "name": "mibici-departures",
+      "version": "1",
+      "alias": "champion",
+      "uri": "models:/mibici-departures/1"
+    },
+    "arrivals": {
+      "name": "mibici-arrivals",
+      "version": "1",
+      "alias": "champion",
+      "uri": "models:/mibici-arrivals/1"
+    }
+  }
+}

@@ -6,6 +6,8 @@ PROJECT_NAME = team2_mlops2026
 PYTHON_VERSION = 3.12
 PYTHON_INTERPRETER ?= .venv/bin/python
 MLFLOW_PORT ?= 5001
+SERVE_HOST ?= 127.0.0.1
+SERVE_PORT ?= 8000
 
 #################################################################################
 # COMMANDS                                                                      #
@@ -111,6 +113,24 @@ register:
 .PHONY: predict
 predict:
 	$(PYTHON_INTERPRETER) -m team2_mlops2026.modeling.predict
+
+
+## Export the registered champions to models/ (with model_card.json) for the prediction service
+.PHONY: export
+export:
+	$(PYTHON_INTERPRETER) -m team2_mlops2026.modeling.export
+
+
+## Serve the exported champions with FastAPI on http://127.0.0.1:8000 (Swagger UI at /docs)
+.PHONY: serve
+serve:
+	$(PYTHON_INTERPRETER) -m uvicorn team2_mlops2026.serving.app:app --host $(SERVE_HOST) --port $(SERVE_PORT)
+
+
+## Write the OpenAPI schema and an example request and response to docs/api/
+.PHONY: api-docs
+api-docs:
+	$(PYTHON_INTERPRETER) -m team2_mlops2026.serving.app api-docs
 
 
 ## Every step after the data, in order: features, train, tune, evaluate, register, predict
