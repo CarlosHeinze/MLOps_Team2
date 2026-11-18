@@ -315,6 +315,41 @@ success criterion on the mean of the folds, then the peak-hour WAPE.
   moves to a model that passes the criterion in the backtest, and the previous version stays in the
   Registry for a rollback.
 
+**Reproducibility (`3.02`, `modeling/reproducibility.py`).** What a rebuild of the champion needs,
+and how close it comes:
+
+- **Pinned environment:** `requirements-lock.txt` pins every package, the transitive ones too, as
+  `pip install -r requirements.txt` resolved them in a clean Python 3.12 venv. `make requirements`
+  and the Docker image install with it as constraints, and the image's base is pinned by digest.
+- **One seed:** `features.SEED = 42` reaches every random source: the folds of the target
+  encoder, the `random_state` of the histogram boosting and of LightGBM (which derives its bagging
+  and column-sampling seeds from it), the tuning sampler and the permutation importance. The PCA
+  of the profiles uses the full SVD, which draws nothing at random. No result depends on
+  `PYTHONHASHSEED`: the pipeline orders lists, sorted indexes and dicts, never a set.
+- **Versioned inputs and outputs:** the `snapshot-373aa06d7db0` run holds the feature table and
+  the station profiles that trained the champions, with their digests, and the reference set:
+  the champions' test metrics with full precision, request rows with their expected forecasts,
+  and the metrics of the 14 `train-*` runs. Both registered versions carry the tag `snapshot_run`.
+  `tests/data/reference.json` is a copy, so another machine can compare without the MLflow server.
+- **What is reproduced bit for bit, and what within a tolerance:**
+
+  | What | Reproduced | Why |
+  |---|---|---|
+  | Feature table and profiles | Bit for bit: the same digest | Deterministic steps; `compare` refuses to refit on a table with another digest |
+  | Forecasts of a given model (batch, service, image on amd64 and arm64) | Identical; within 1.8e-15 against the service run on macOS | Inference adds the same trees in the same order. Only the last bit of `exp` differs between the C libraries of macOS and Linux, so `check` allows 1e-9 |
+  | Test metrics of the exported champion | Exactly the recorded ones | Same model, same rows |
+  | LightGBM refit with the same number of threads, on macOS and in a clean Linux container | Metrics within 1.5e-13, forecasts within 6.3e-11 trips | The same sums, up to the rounding of the math library |
+  | LightGBM refit with another number of threads | Metrics within 4.3e-6, forecasts within 0.003 trips | LightGBM builds a histogram per thread and adds them up; in another order a split moves now and then. Tolerance `1e-4` |
+  | Baselines | Exact (tolerance `1e-9`) | Arithmetic without randomness |
+  | Poisson GLM | Tolerance `1e-6` | L-BFGS stops at its own tolerance |
+  | Histogram boosting (`hgb_*`) | Third decimal (Phase 2, two laptops). Tolerance `5e-3` | scikit-learn also sums its histograms across threads |
+
+- **Action:** a difference within these tolerances is the environment, not a different model; a
+  larger one means other data, other code or other packages, and `make reproduce` names which
+  check failed. To make LightGBM bit for bit across machines, the next retraining can fix `n_jobs`
+  and set `deterministic=True` with `force_col_wise=True`. It is not set now because it would
+  change the registered champion.
+
 ## 9. Features
 
 All features are computed per station-hour, using only information available at prediction
