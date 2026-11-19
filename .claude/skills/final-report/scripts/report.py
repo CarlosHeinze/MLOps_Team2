@@ -275,12 +275,39 @@ def read_report() -> str:
     return REPORT.read_text(encoding="utf-8")
 
 
+def where(html: str, position: int) -> str:
+    """'L123 · 3.7 Reproducibilidad…': the line and the last heading before a position."""
+    line = html.count("\n", 0, position) + 1
+    headings = re.findall(r"<h[1-3][^>]*>(.*?)</h[1-3]>", html[:position], re.DOTALL)
+    heading = re.sub(r"<[^>]+>", "", headings[-1]).strip() if headings else "header"
+    return f"L{line} · {heading[:40]}"
+
+
 def problems(html: str) -> list[str]:
     """Everything the delivery instructions and the team's rules require, as messages."""
     found = []
-    for match in re.finditer(r'<[^>]*class="[^"]*\btodo\b[^"]*"[^>]*>(.*?)</', html, re.DOTALL):
-        text = re.sub(r"<[^>]+>|\s+", " ", match.group(1)).strip()
-        found.append(f"TODO left: {text[:110]}")
+    todo = r'<(\w+)[^>]*class="[^"]*\btodo\b[^"]*"[^>]*>(.*?)</\1>'
+    for match in re.finditer(todo, html, re.DOTALL):
+        text = re.sub(r"<[^>]+>|\s+", " ", match.group(2)).strip()
+        found.append(f"TODO ({where(html, match.start())}): {text[:100]}")
+    ids = set(re.findall(r'\bid="([^"]+)"', html))
+    for match in re.finditer(r'<a[^>]*class="xref"[^>]*href="#([^"]+)"', html):
+        if match.group(1) not in ids:
+            found.append(
+                f"reference to a missing id ({where(html, match.start())}): #{match.group(1)}"
+            )
+    caption = r'<figcaption[^>]*>|<p[^>]*class="[^"]*\b(?:figcap|tabcap)\b[^"]*"[^>]*>'
+    for match in re.finditer(rf"(?:{caption})\s*((?:Figura|Tabla) \d+\.)", html):
+        found.append(
+            f"numbered by hand ({where(html, match.start())}): drop '{match.group(1)}', "
+            "the PDF numbers captions in order"
+        )
+    for match in re.finditer(r'<p class="note">\s*((?:Figura|Tabla) \d+\.)', html):
+        found.append(
+            f"caption without class ({where(html, match.start())}): use "
+            f'class="note {"tabcap" if match.group(1).startswith("Tabla") else "figcap"}" '
+            f"and drop '{match.group(1)}'"
+        )
     for url, what in ((GITHUB_URL, "GitHub repository"), (DOCKERHUB_URL, "Docker Hub image")):
         if f'href="{url}' not in html:
             found.append(f"missing the mandatory link to the {what}: {url}")
@@ -300,8 +327,10 @@ def problems(html: str) -> list[str]:
     return found
 
 
-def cmd_check(_: argparse.Namespace) -> int:
+def cmd_check(args: argparse.Namespace) -> int:
     found = problems(read_report())
+    if getattr(args, "only", None):
+        found = [p for p in found if args.only.lower() in p.lower()]
     pdf_note = (
         f"; {PDF.name} has {pages(PDF)} pages" if PDF.exists() else f"; {PDF.name} not built yet"
     )
@@ -405,6 +434,7 @@ def cmd_build(args: argparse.Namespace) -> int:
     if not args.no_activity:
         cmd_activity(args)
     cmd_pdf(args)
+    print("PDF built; now the delivery check:")
     return cmd_check(args)
 
 
@@ -415,7 +445,10 @@ def main() -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("init", help="copy the template to reports/Entrega_Final_Equipo02.html")
     sub.add_parser("activity", help="fill the GitHub activity table (git + gh)")
-    sub.add_parser("check", help="list what the delivery still lacks")
+    p = sub.add_parser("check", help="list what the delivery still lacks")
+    p.add_argument(
+        "--only", help="only the messages that mention this text, e.g. a section: --only 3.7"
+    )
     p = sub.add_parser("figures", help="save a notebook's figures to reports/figures/<phase>/")
     p.add_argument("notebook", help="e.g. notebooks/3.02-team2-reproducibility.ipynb")
     p.add_argument("--cell", type=int, help="only this code cell (index in the notebook)")

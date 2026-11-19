@@ -17,7 +17,8 @@
   }
   * { box-sizing: border-box; }
   html, body { background: #fff; }
-  body { margin: 0; color: var(--ink); font: 9.4pt/1.45 "Avenir Next", "Helvetica Neue", Arial, sans-serif; }
+  /* Avenir Next is macOS only; Windows falls back to Segoe UI, so page breaks differ by machine */
+  body { margin: 0; color: var(--ink); font: 9.4pt/1.45 "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
   a { color: var(--accent); text-decoration: none; }
   p { margin: 0 0 6pt; }
   ul { margin: 0 0 6pt; padding-left: 14pt; }
@@ -66,6 +67,7 @@
   figure { margin: 6pt 0 9pt; break-inside: avoid; }
   figure img { width: 100%; display: block; border: 1px solid var(--rule); }
   figcaption { font-size: 7.9pt; color: var(--muted); margin-top: 3pt; }
+  figcaption > b.num-label, .figcap > b.num-label, .tabcap > b.num-label { color: var(--muted); font-weight: 600; }
   figure.w80 img, figure.w80 figcaption { width: 82%; margin-left: auto; margin-right: auto; }
   figure.w65 img, figure.w65 figcaption { width: 65%; margin-left: auto; margin-right: auto; }
   figure.w60 img, figure.w60 figcaption { width: 60%; margin-left: auto; margin-right: auto; }
@@ -161,7 +163,7 @@
   <div><h4>Variables</h4>Estación: target encoding, ubicación, capacidad, perfiles PCA. Tiempo: hora y mes en seno/coseno, día de la semana one‑hot. Historial: demanda 2 y 7 días antes y media de 4 semanas. Sin género ni edad.</div>
   <div class="mon"><h4>Monitoreo</h4>Datos: contrato en cada mes nuevo; drift de volumen, perfil horario y estaciones nuevas. Modelo: WAPE y MAE mensual por estación contra el baseline, con alerta si deja de superarlo. Negocio: estación‑horas sin bicicletas o sin anclajes y km de camión por bicicleta redistribuida. <span class="todo">umbrales, alertas y acciones de drift de la Fase 3, Canvas §10</span></div>
 </div>
-<p class="note">Figura 1. Machine Learning Canvas v1.2 (Dorard) del proyecto, condensado; el completo está en <code>references/ml-canvas.md</code>.</p>
+<p class="note figcap" id="fig-canvas">Machine Learning Canvas v1.2 (Dorard) del proyecto, condensado; el completo está en <code>references/ml-canvas.md</code>.</p>
 
 <h3>1.2 Por qué MLOps</h3>
 <p class="todo">Contextualización y justificación del uso de MLOps para este problema: un modelo que se reentrena cada mes con datos nuevos, que debe servirse cada noche y cuyo desempeño cambia con la red (~100 estaciones nuevas en 2026). Qué riesgo cubre cada práctica (versionado y linaje, tracking, registry, pruebas, contenedor, reproducibilidad, monitoreo de drift), citando la deuda técnica oculta (Sculley et al., 2015) y la definición de MLOps (Kreuzberger et al., 2023).</p>
@@ -180,7 +182,7 @@
   <div class="user span3"><b>Pronóstico batch nocturno</b> (<code>make predict</code>): 24 h por estación desde <code>models:/mibici-&lt;objetivo&gt;@champion</code></div>
   <div class="user span3"><b>Equipo de redistribución</b>: lista de estaciones a surtir o vaciar; consultas en línea a la API</div>
 </div>
-<p class="note">Figura 2. Componentes y herramientas de la solución por fase. <span class="todo">revisar contra el pipeline final del README (#43)</span></p>
+<p class="note figcap" id="fig-solucion">Componentes y herramientas de la solución por fase. <span class="todo">revisar contra el pipeline final del README (#43)</span></p>
 
 <h2 id="actividades"><span class="n">2</span>Actividades realizadas en cada fase</h2>
 <p class="todo">Rúbrica «Actividades y tareas por rol» (20). Una línea por fase: qué se pidió, qué se entregó y con qué evidencia. El detalle de los métodos va en la sección 3 y el de los roles en la 4.</p>
@@ -263,5 +265,28 @@
   <p>Treveil, M. et al. (2020). <i>Introducing MLOps: How to scale machine learning in the enterprise</i>. O'Reilly Media.</p>
 </div>
 
+<script>
+  // Numbers figures and tables in the order they appear, so sections can be written in any order.
+  // A figure caption is a <figcaption> or a <p class="note figcap">; a table caption is a
+  // <p class="note tabcap"> after its table. Captions carry no number of their own. Refer to one
+  // with an empty link of class xref to its id; the id goes on the <figure> or on the caption.
+  (() => {
+    const label = { fig: "Figura", tab: "Tabla" };
+    const count = { fig: 0, tab: 0 };
+    const numbers = {};
+    document.querySelectorAll("figcaption, .figcap, .tabcap").forEach((caption) => {
+      const kind = caption.classList.contains("tabcap") ? "tab" : "fig";
+      const text = `${label[kind]} ${++count[kind]}`;
+      const id = caption.id || caption.closest("figure")?.id;
+      if (id) numbers[id] = text;
+      caption.insertAdjacentHTML("afterbegin", `<b class="num-label">${text}.</b> `);
+    });
+    document.querySelectorAll("a.xref").forEach((ref) => {
+      const text = numbers[ref.getAttribute("href").slice(1)];
+      ref.textContent = text || "¿referencia?";
+      if (!text) ref.classList.add("todo");
+    });
+  })();
+</script>
 </body>
 </html>

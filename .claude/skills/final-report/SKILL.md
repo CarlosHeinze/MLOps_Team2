@@ -29,7 +29,7 @@ as they are.
 | `references/rubric.md` | Instructions, outline and rubric (Canvas, 18 Nov 2026). |
 | `references/sources.md` | Where each number and figure comes from, and which ones need MLflow or data. |
 | `references/fase1.html`, `fase2.html` | The delivered reports: their content, voice and level of detail. |
-| `scripts/report.py` | `init`, `activity`, `figures`, `pdf`, `check`, `build` (only the standard library). |
+| `scripts/report.py` | `init`, `figures`, `pdf` and `check [--only TEXT]` while writing; `activity` and `build` for the final pass. Only the standard library. |
 
 Run the script with the project's Python: `.venv/bin/python` on macOS and Linux,
 `.venv\Scripts\python` on Windows, or any Python 3.10+. Below it is written as `report.py`, short
@@ -37,11 +37,14 @@ for `python .claude/skills/final-report/scripts/report.py`.
 
 ## Workflow
 
-1. **Start from what exists.** Run `git pull` and look for the report on other branches
-   (`git branch -a`, `gh pr list`). Several people work on it, so two copies would conflict. If
-   the report does not exist yet, run `report.py init` to create it from the template. Work on
-   the #44 branch, and let the person who opens the PR be the one who wrote the sections, so
-   their activity shows on GitHub.
+1. **Start from what exists.** Several people write this report, and two copies would conflict.
+   - Run `git fetch` and look for a #44 branch or PR (`git branch -a`, `gh pr list`).
+   - If one exists, check it out and pull. If not, create one from an up-to-date `master` (for
+     example `44-write-the-final-report`) and run `report.py init` to start the report from the
+     template.
+   - Agree on who writes which sections. Each person commits their own sections, so their work
+     shows in the GitHub activity the rubric asks for.
+   - Do not commit or push unless the person asks.
 2. **Read** `references/rubric.md` and `references/sources.md`. Skim `references/fase2.html` to
    pick up the voice and the level of detail. The section headings of both delivered reports
    show how each one was organized.
@@ -52,24 +55,35 @@ for `python .claude/skills/final-report/scripts/report.py`.
      the roles table). Keep their numbers and figures as they are.
    - Phase 3: gather the evidence first (commands, docs, notebooks; see `sources.md`), then
      write.
+   - Whoever writes a Phase 3 subsection also fills the todos that depend on it: its cell in the
+     ML Canvas (§5 serving, §8 reproducibility, §10 monitoring), its box in the solution
+     diagram, its row in section 2, and its key figure in the summary.
    - Write the executive summary and the key figures last.
+   - When two sources disagree, use the record of the run (the notebook output, `docs/…`, the
+     MLflow run) over a summary of it (the README), and tell the person about the mismatch.
 4. **Figures.**
    - Notebook figures: `report.py figures notebooks/<nb>.ipynb` saves every plot as
      `reports/figures/fase3/<nb>_c<cell>_<n>.png`.
    - Screenshots of Swagger, Docker Hub or MLflow: save them as PNG in `reports/figures/fase3/`.
      Use the browser tools if you have them; otherwise ask the person to take them. Crop each one
      to what the caption describes.
-5. **Build and look at it.** Run `report.py build`. It refreshes the GitHub activity table, prints
-   the PDF and lists what is still missing. Then read the PDF pages (the Read tool renders them)
-   and fix what you see:
-   - a heading alone at the bottom of a page;
-   - a table or figure split across pages;
-   - an image too large for its point;
-   - an almost empty page.
-   Use the `page-break` class, the figure widths (`w80`, `w65`, `w60`) or the `.two` grid.
-6. **Before delivering:** `report.py check` must print "Ready to deliver". Every member must have
-   reviewed the PDF (#44 acceptance criteria). Then commit the HTML, the figures and the PDF, and
-   open the PR.
+5. **Print it and look at it.**
+   - While writing, run `report.py pdf`: it is fast, offline and only prints. Then
+     `report.py check --only 3.7` lists what is left in your section, with line numbers.
+   - Read the PDF pages where your section lands (the Read tool renders them) and fix what you
+     see: a table or figure split across pages, an image too large for its point, an unreadable
+     axis.
+   - Leave whole-document layout alone until every section is in, because everything reflows:
+     headings alone at the bottom of a page, blank space before a table that cannot split.
+6. **Final pass and delivery** (one person, on one machine).
+   - Page breaks depend on the fonts installed. Avenir Next exists only on macOS; Windows uses
+     Segoe UI. Do the final layout pass and build the delivered PDF on the same machine.
+   - Run `report.py build`. It fetches git, calls the GitHub API to refresh the activity table,
+     prints the PDF, and then runs `check`, which must print "Ready to deliver".
+   - Check the layout page by page with `page-break`, the figure widths (`w80`, `w65`, `w60`),
+     the `.two` grid, or `class="flowing"` on a long table so it may split.
+   - Every member reviews the PDF (#44 acceptance criteria). Then commit the HTML, the figures
+     and the PDF, and open the PR.
 
 If you could not verify something (for example, the drift notebook is not merged yet), leave a
 `<span class="todo">` with what is missing and tell the person. A visible gap can be fixed before
@@ -86,8 +100,31 @@ the deadline; a made-up number cannot be detected in time.
   This is what the rubric's "Excelente" asks for: methods argued "de forma clara y detallada" and
   results with "fundamento metodológico".
 - **Tables before prose** for comparisons, rules, stages and roles. The chosen row uses
-  `class="pick"` and baselines use `class="base"`. Tables and figures are numbered, and each
-  caption says what to look at and where it comes from.
+  `class="pick"` and baselines use `class="base"`. Each caption says what to look at and where it
+  comes from.
+- **Captions are numbered when the PDF prints**, in order, so sections can be written in any
+  order and moved around.
+  - Write no number yourself. Use `<figcaption>` inside a `<figure>`, or `<p class="note figcap">`
+    under a diagram, and `<p class="note tabcap">` right after a table.
+  - Put an `id` on the figure or the caption, and refer to it with
+    `<a class="xref" href="#tab-tolerancias"></a>`, which prints as "Tabla 3".
+  - The delivered reports in `references/` number by hand ("Figura 4.", "Tabla 2."). Drop those
+    numbers when you reuse a caption; `check` flags any that remain.
+- **Length.** Aim for about 14 to 18 Letter pages in total. Rough budget per part:
+  | Part | Pages |
+  |---|---|
+  | Summary and section 1 (canvas, MLOps, diagram) | ~3 |
+  | Section 2 | ½ |
+  | 3.1 to 3.3 (phases 1 and 2, condensed) | ~1 each |
+  | 3.4 to 3.8 (Phase 3) | 1, up to 1½ each |
+  | Section 4 with the activity table | ~2 |
+  | Conclusions | ~1 |
+  | AI declaration and references | ~1 |
+  A subsection that runs past its budget needs cutting: keep the table and the decision, drop
+  the narration that repeats them.
+- **Small numbers** in scientific notation with a real minus sign: `8.4 × 10<sup>−15</sup>`, not
+  `8.4e-15`. Wide plots (much wider than tall) stay at full width or `w80`, so their axes stay
+  readable.
 - **Roles as handoffs.** Each role hands a verifiable artifact to the next one (a digest, a run, a
   Registry alias, an image tag, the reference set), not a verbal agreement. Name the issues and
   PRs of each person. The activity table shows who committed what. Do not hide a member with
@@ -96,8 +133,7 @@ the deadline; a made-up number cannot be detected in time.
 - **Integrate, do not paste.** The final report tells one story: the problem (Canvas) → data →
   model → service → reproducibility → monitoring, and how each phase used the previous one. The
   earlier reports are condensed, about one page per phase, keeping their key tables and one or
-  two figures. Phase 3 gets the most detail because it is new. Aim for about 14 to 18 Letter
-  pages; phases 1 and 2 took 8 and 10.
+  two figures. Phase 3 gets the most detail because it is new.
 - **Conclusions that reflect.** What worked and why, what failed and how it was fixed (the
   baseline that was not beaten at first, the PCA that helps only a little, the thread-dependent
   refit), which earlier "areas for improvement" were solved, and which concrete work remains.
@@ -121,6 +157,8 @@ The template's CSS is the Phase 2 CSS, plus the Phase 1 canvas and a few new pie
 - `.criterion`: a highlighted criterion;
 - tables, with the classes `num`, `pick`, `base`, `flowing` (may split across pages) and `mono`;
 - figures, with the widths `w80`, `w65` and `w60` and the `.two` grid;
+- captions with `figcap` and `tabcap` and references with `a.xref`, numbered by a short script at
+  the end of the template;
 - `.note`, `.refs` and `.page-break`.
 
 The footer and the page numbers are in `@page`, so nothing else is needed to print. The text
@@ -133,9 +171,10 @@ do not edit it by hand. The section ids (`resumen`, `introduccion`, `actividades
 - The links to the GitHub repository and to the Docker Hub image.
 - All four members, named.
 - The GitHub activity table, filled.
-- No `todo` left.
+- No `todo` left (each one is listed with its line and section).
 - Every image local and present.
 - All the outline sections, by their ids.
+- Every `xref` pointing to an existing id, and no caption numbered by hand.
 
 Two things it cannot check, so check them by eye:
 
