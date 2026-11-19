@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Fase 1 · Equipo 02 · MiBici</title>
+<style>
+  @page { size: Letter; margin: 15mm 16mm 17mm 16mm; }
+  :root {
+    --ink: #1b2733; --muted: #5b6875; --accent: #0e6f68; --accent-soft: #e7f2f0;
+    --rule: #d5dfdd; --head: #15324d; --warn: #8a5a00; --warn-soft: #fbf3e2;
+  }
+  * { box-sizing: border-box; }
+  html, body { background: #fff; }
+  body { margin: 0; color: var(--ink); font: 9.4pt/1.45 "Avenir Next", "Helvetica Neue", Arial, sans-serif; }
+  a { color: var(--accent); text-decoration: none; }
+  p { margin: 0 0 6pt; }
+  ul { margin: 0 0 6pt; padding-left: 14pt; }
+  li { margin-bottom: 2pt; }
+  b, strong { font-weight: 600; color: var(--head); }
+  code { font: 8.3pt Menlo, Consolas, monospace; background: #f1f4f4; padding: 0 2pt; border-radius: 2pt; }
+
+  .kicker { font-size: 8pt; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+  h1 { font-size: 21pt; line-height: 1.15; color: var(--head); margin: 4pt 0 4pt; font-weight: 700; }
+  .subtitle { font-size: 11pt; color: var(--muted); margin-bottom: 8pt; }
+  .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 2pt 18pt; font-size: 8.6pt; color: var(--muted);
+          border-top: 2pt solid var(--accent); border-bottom: 1px solid var(--rule); padding: 6pt 0; margin-bottom: 10pt; }
+  .meta b { color: var(--ink); font-weight: 600; }
+  .team { display: grid; grid-template-columns: max-content max-content; gap: 0 14pt; margin-top: 1pt; color: var(--ink); }
+  .team span:nth-child(even) { font-variant-numeric: tabular-nums; color: var(--muted); }
+
+  h2 { font-size: 13pt; color: var(--head); margin: 14pt 0 6pt; padding-bottom: 3pt; border-bottom: 1px solid var(--rule);
+       break-after: avoid; }
+  h2 .n { color: var(--accent); margin-right: 4pt; }
+  h3 { font-size: 10pt; color: var(--head); margin: 9pt 0 3pt; break-after: avoid; }
+  .page-break { break-before: page; }
+
+  .summary { background: var(--accent-soft); border-left: 3pt solid var(--accent); padding: 8pt 10pt; margin: 0 0 8pt; }
+  .summary p:last-child { margin: 0; }
+  .keyfigs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6pt; margin: 6pt 0 2pt; }
+  .keyfigs div { background: #fff; border: 1px solid var(--rule); border-radius: 3pt; padding: 5pt 7pt; font-size: 8.3pt; color: var(--muted); }
+  .keyfigs b { display: block; font-size: 12.5pt; color: var(--head); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 8.4pt; margin: 4pt 0 8pt; break-inside: avoid; }
+  th { text-align: left; background: #e9f0ef; color: var(--head); font-weight: 600; padding: 4pt 5pt; border-bottom: 1px solid #b9c9c6; }
+  td { padding: 3.5pt 5pt; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tr.pick td { background: #f1f8f6; font-weight: 600; }
+  .mono { font: 7.3pt Menlo, Consolas, monospace; }
+  .mono.run { font-size: 7pt; white-space: nowrap; }
+  figure.w80 img { width: 82%; margin: 0 auto; }
+  figure.w80 figcaption { width: 82%; margin: 3pt auto 0; }
+
+  figure { margin: 6pt 0 9pt; break-inside: avoid; }
+  figure img { width: 100%; display: block; border: 1px solid var(--rule); }
+  figcaption { font-size: 7.9pt; color: var(--muted); margin-top: 3pt; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10pt; }
+
+  .tag { display: inline-block; font-size: 6.8pt; font-weight: 700; letter-spacing: .06em; padding: 0 4pt; border-radius: 2pt;
+         border: 1px solid var(--accent); color: var(--accent); vertical-align: 1pt; }
+
+  /* ML Canvas */
+  .canvas { display: grid; grid-template-columns: repeat(5, 1fr); grid-auto-rows: auto; gap: 4pt; font-size: 7.5pt; line-height: 1.33;
+            margin: 6pt 0 4pt; break-inside: avoid; }
+  .canvas div { border: 1px solid #b9c9c6; border-radius: 3pt; padding: 4pt 5pt; background: #fbfdfc; }
+  .canvas h4 { margin: 0 0 2pt; font-size: 7.4pt; letter-spacing: .05em; text-transform: uppercase; color: var(--accent); }
+  .canvas .vp { grid-row: span 2; background: var(--accent-soft); }
+  .canvas .mon { grid-column: span 5; }
+
+  /* flow diagrams */
+  .flow { display: flex; align-items: stretch; gap: 0; margin: 6pt 0 8pt; break-inside: avoid; }
+  .flow .st { flex: 1; border: 1px solid #b9c9c6; border-radius: 3pt; padding: 4pt 5pt; font-size: 7.6pt; line-height: 1.3; background: #fbfdfc; }
+  .flow .st b { display: block; font-size: 8pt; }
+  .flow .st .d { font: 7pt Menlo, Consolas, monospace; color: var(--accent); }
+  .flow .ar { align-self: center; color: var(--accent); font-size: 11pt; padding: 0 2pt; }
+
+  .note { font-size: 8pt; color: var(--muted); }
+  .refs { font-size: 8pt; color: var(--muted); }
+  .refs p { margin-bottom: 3pt; padding-left: 12pt; text-indent: -12pt; }
+</style>
+</head>
+<body>
+
+<div class="kicker">Tecnológico de Monterrey · Maestría en Inteligencia Artificial Aplicada · TC5044.10 Operaciones de Aprendizaje Automático</div>
+<h1>MiBici: una base de datos trazable para pronosticar la demanda por estación</h1>
+<div class="subtitle">Fase 1 · Avance de proyecto · Equipo 02</div>
+<div class="meta">
+  <div>
+    <b>Integrantes</b>
+    <div class="team">
+      <span>Javier Ramírez</span><span>A01797453</span>
+      <span>Carlos Antonio Heinze Mortera</span><span>A01700179</span>
+      <span>Julián Malo Romero</span><span>A01797459</span>
+      <span>Carlos Arturo Chavero Cruz</span><span>A01797583</span>
+    </div>
+  </div>
+  <div>
+    <div><b>Fecha:</b> 25 de octubre de 2026</div>
+    <div><b>Repositorio:</b> <a href="https://github.com/CarlosHeinze/MLOps_Team2">github.com/CarlosHeinze/MLOps_Team2</a></div>
+    <div><b>Datos:</b> <a href="https://mibici.net/es/datos-abiertos/">mibici.net/es/datos-abiertos</a>, dic 2014 – sep 2026</div>
+  </div>
+</div>
+
+<div class="summary">
+  <p><b>Resumen ejecutivo.</b> MiBici, el sistema de bicicleta pública de Guadalajara, pierde viajes cuando una estación se queda sin bicicletas o sin anclajes. Proponemos pronosticar, la noche anterior, las salidas y llegadas de cada estación por hora para planear la redistribución. En la Fase 1 construimos la base para ese modelo: una canalización modular que descarga, normaliza, limpia y analiza el historial completo, deriva una tabla de demanda estación‑hora y perfiles de uso con PCA, y registra cada versión de los datos en MLflow con un digest que encadena las etapas.</p>
+  <div class="keyfigs">
+    <div><b>39,078,984</b>viajes normalizados de 142 archivos mensuales</div>
+    <div><b>37,786,886</b>viajes tras la limpieza (−3.3 %)</div>
+    <div><b>12.2 M</b>filas estación‑hora de 486 estaciones</div>
+    <div><b>26 componentes</b>PCA que explican el 90.1 % de la varianza</div>
+    <div><b>5 etapas</b>versionadas en MLflow con linaje por digest</div>
+    <div><b>163 pruebas</b>automáticas; lint sin hallazgos</div>
+  </div>
+  <p class="note" style="margin-top:5pt">Todas las cifras se obtuvieron ejecutando el código del repositorio sobre el historial completo, en dos equipos (Windows y macOS) con totales idénticos.</p>
+</div>
+
+<h2><span class="n">1</span>Análisis de requerimientos y ML Canvas</h2>
+<p><b>El problema.</b> Cada viaje sale de una estación y termina en otra, así que las bicicletas se acumulan donde la gente llega y se agotan donde sale. Los datos muestran que el desbalance es grande y estructural:</p>
+<ul>
+  <li><b>Flujos unidireccionales:</b> en todo el historial, el grupo Av. Vallarta / Los Arcos envió ~320 mil viajes más de los que recibió, mientras López Cotilla / Penitenciaría recibió ~241 mil más de los que envió.</li>
+  <li><b>Una estación se vacía o llena en un día:</b> la estación mediana tiene 15 anclajes y, desde 2025, el flujo neto diario supera 12 bicicletas en el 10 % de los días‑estación y 32 en el 1 %.</li>
+  <li><b>La demanda es predecible y concentrada:</b> picos laborales a las 8:00 y 18:00, un solo pico al mediodía en fin de semana, y el 10 % de las 486 estaciones origina el 39.5 % de los viajes.</li>
+</ul>
+<p><b>Propuesta de valor.</b> El usuario es el equipo de redistribución de MiBici; indirectamente, los usuarios que encuentran bicicleta al salir y anclaje al llegar. Cada noche recibiría una lista priorizada de estaciones que se vaciarán o llenarán, con la hora y el número de bicicletas esperado. Un promedio histórico por estación capta la semana típica pero no la tendencia (crecimiento, quiebre por COVID, récord en septiembre de 2026) ni las interacciones estación × hora × día; por eso usamos ML, y las reglas simples quedan como los <b>baselines que el modelo debe superar</b>. El Canvas completo está en <code>references/ml-canvas.md</code>.</p>
+
+<div class="canvas">
+  <div><h4>Tarea de predicción</h4>Pronóstico multiserie de conteos. Entidad: estación‑hora (~480 estaciones activas). Salidas y llegadas en cada una de las próximas 24 h; flujo neto = llegadas − salidas.</div>
+  <div><h4>Decisiones</h4>Cada noche y a las ~13:00: bicicletas proyectadas = actuales + flujo neto acumulado. Se marcan estaciones bajo un mínimo o sobre capacidad − margen, se priorizan por viajes no atendidos y se planean rutas de camiones.</div>
+  <div class="vp"><h4>Propuesta de valor</h4>Beneficiario: equipo de redistribución de MiBici; indirectamente, los usuarios.<br><br>Dolor: flujos unidireccionales que vacían o llenan estaciones en horas.<br><br>Integración: lista o tablero nocturno de estaciones a surtir o vaciar, con hora y cantidad esperadas.</div>
+  <div><h4>Recolección de datos</h4>142 CSV mensuales descargados de forma idempotente con manifiesto SHA‑256. Cada mes nuevo se normaliza, valida y limpia; cada versión queda en MLflow. Las etiquetas llegan solas: los viajes del mes siguiente.</div>
+  <div><h4>Fuentes de datos</h4>Datos abiertos MiBici: viajes y nomenclatura actual (484 estaciones, capacidad). Candidatas: clima, festivos, calendario escolar. Faltan: inventario en vivo e historial de estaciones.</div>
+  <div><h4>Simulación de impacto</h4>Backtest con origen móvil en los últimos 12 meses contra naive estacional y promedio histórico: MAE, WAPE, devianza de Poisson. Criterio propuesto: WAPE ≥ 10 % menor en horas pico, sin grupo de estaciones peor que el baseline.</div>
+  <div><h4>Hacer predicciones</h4>Batch nocturno (~23:00) para las próximas 24 h, refresco opcional a mediodía. ~480 × 24 ≈ 11.5 mil pronósticos por corrida, en segundos. Requiere el inventario en vivo del operador.</div>
+  <div><h4>Construcción de modelos</h4>Un modelo global por objetivo: primero baselines, luego gradient boosting con pérdida Poisson/Tweedie. Reentrenamiento mensual o ante drift, con partición temporal. Cada corrida en MLflow.</div>
+  <div><h4>Variables</h4>Estación: target encoding, ubicación, capacidad, perfiles PCA. Tiempo: hora y mes en seno/coseno, día de la semana one‑hot. Historial: demanda 2 y 7 días antes y media de 4 semanas. Sin género ni edad.</div>
+  <div class="mon"><h4>Monitoreo</h4>Datos: contrato en cada mes nuevo; drift de volumen, perfil horario y estaciones nuevas (~100 abiertas entre mayo y agosto de 2026). Modelo: WAPE y MAE mensual por estación contra el baseline, con alerta si deja de superarlo. Negocio: estación‑horas sin bicicletas o sin anclajes y km de camión por bicicleta redistribuida.</div>
+</div>
+<p class="note">Figura 1. Machine Learning Canvas v1.2 (Dorard) del proyecto, condensado. Los modelos, el backtest y el monitoreo corresponden a la Fase 2; la Fase 1 prepara los datos que los alimentan.</p>
+
+<h2><span class="n">2</span>Manipulación y preparación de datos</h2>
+<div class="flow">
+  <div class="st"><b>Extracción</b>143 CSV (3.1 GB) + manifiesto SHA‑256<div class="d">mibici_raw 25643d10</div></div><div class="ar">→</div>
+  <div class="st"><b>Normalización</b>Parquet mensual, esquema único<div class="d">interim 4d7eba9d</div></div><div class="ar">→</div>
+  <div class="st"><b>Limpieza</b>contrato de datos e imputación<div class="d">processed 3cef612f</div></div><div class="ar">→</div>
+  <div class="st"><b>Variables</b>tabla estación‑hora<div class="d">features 47db7793</div></div><div class="ar">→</div>
+  <div class="st"><b>Perfiles PCA</b>371 estaciones × 26<div class="d">profiles c174ef70</div></div>
+</div>
+<p><b>Adquisición.</b> <code>raw_data_extraction</code> descubre los enlaces en la página de datos abiertos, descarga solo lo que falta y mantiene un <code>manifest.json</code> con URL, tamaño, SHA‑256 y fecha de cada archivo. Los CSV originales nunca se modifican.</p>
+<p><b>Normalización.</b> El origen cambió de formato a lo largo de 12 años: 100 archivos vienen en UTF‑8 y 43 en Latin‑1; 139 usan fechas ISO y 3 usan día/mes sin segundos; los nombres de columnas varían entre años. <code>raw_data_normalization</code> detecta cada variante, unifica nombres, tipos y fechas, y escribe un Parquet por mes: 39,079,468 filas, que son 39,078,984 viajes más las 484 estaciones de la nomenclatura. Un archivo que no coincide con el esquema detiene la etapa (<code>SchemaError</code>).</p>
+<p><b>Limpieza con contrato de datos.</b> Cada regla se justificó con pruebas sobre los datos en el notebook 1.02 y vive en <code>interim_data_cleaning</code>. Cada mes se valida antes de escribirse y deja un <code>cleaning_report.json</code> con las filas que tocó cada regla.</p>
+<table>
+  <tr><th>Regla</th><th>Criterio</th><th>Acción</th><th class="num">Afectados</th></tr>
+  <tr><td>Duplicados</td><td>Filas idénticas; después, <code>Viaje_Id</code> debe ser único</td><td>Eliminar</td><td class="num">758</td></tr>
+  <tr><td>Viajes inválidos</td><td>Duración &lt; 60 s (anclaje fallido) o &gt; 24 h; velocidad &gt; 30 km/h</td><td>Eliminar</td><td class="num">1,291,340</td></tr>
+  <tr><td>Demografía inválida</td><td>Género fuera de {M, F}; edad al viaje fuera de 16–90 años</td><td>Valor a nulo (el viaje se conserva)</td><td class="num">8,245</td></tr>
+  <tr><td>Faltantes recuperables</td><td>Género o año de nacimiento conocidos en otros viajes del mismo usuario</td><td>Imputar del perfil del usuario</td><td class="num">37,264</td></tr>
+  <tr><td>Faltantes restantes</td><td>Sin información del usuario (género / año de nacimiento)</td><td>Se conservan como <code>&lt;NA&gt;</code></td><td class="num">113,587 / 74,020</td></tr>
+</table>
+
+<h3>Experimento con versiones del dataset: estrategia de datos faltantes</h3>
+<p>Antes de fijar la regla de faltantes comparamos tres versiones del dataset limpio. La comparación se registra en MLflow como métricas <code>strategy_a_*</code>, <code>strategy_b_*</code> y <code>strategy_c_*</code> del run <code>clean-interim-trips</code> (notebook 1.02), junto con el dataset resultante.</p>
+<table>
+  <tr><th>Versión del dataset</th><th class="num">Conservados</th><th class="num">Pérdida máx.<br>por mes</th><th class="num">Pérdida máx.<br>por estación</th><th class="num">Valores<br>imputados</th><th class="num">Brecha<br>% mujeres</th><th class="num">KS<br>edad</th></tr>
+  <tr><td style="white-space:nowrap">A · eliminar filas</td><td class="num">99.43 %</td><td class="num">1.19 %</td><td class="num">6.12 %</td><td class="num">0</td><td class="num">0.00 pp</td><td class="num">0.0000</td></tr>
+  <tr><td style="white-space:nowrap">B · relleno global</td><td class="num">100 %</td><td class="num">0 %</td><td class="num">0 %</td><td class="num">224,871</td><td class="num">0.25 pp</td><td class="num">0.0016</td></tr>
+  <tr class="pick"><td style="white-space:nowrap">C · perfil del usuario ✓</td><td class="num">100 %</td><td class="num">0 %</td><td class="num">0 %</td><td class="num">37,264</td><td class="num">0.18 pp</td><td class="num">0.0008</td></tr>
+</table>
+<p><b>Decisión: C.</b> Eliminar filas (A) no mueve las distribuciones globales, pero quita hasta el 6 % de los viajes de una estación, y la demanda por estación es justamente nuestro objetivo. El relleno global (B) inventa 6 veces más valores y distorsiona más la edad y el género. C conserva todos los viajes, imputa solo lo que el propio usuario ya reveló y deja el resto como faltante explícito.</p>
+
+<h2><span class="n">3</span>Análisis exploratorio y preprocesamiento</h2>
+<div>
+  <figure class="w80"><img src="figures/fase1/1.03_c10_1.png" alt="Viajes por mes"><figcaption>Figura 2. Viajes por mes: crecimiento hasta 2019, quiebre por COVID en 2020–21 y récord en septiembre de 2026 (notebook 1.03).</figcaption></figure>
+  <figure><img src="figures/fase1/1.03_c14_2.png" alt="Viajes por día y hora"><figcaption>Figura 3. Porcentaje de viajes por día y hora de inicio: picos laborales a las 8:00 y 18:00, pico de mediodía en domingo (notebook 1.03).</figcaption></figure>
+</div>
+<table>
+  <tr><th style="width:46%">Hallazgo del EDA (estadística descriptiva y visual)</th><th>Decisión que tomamos</th></tr>
+  <tr><td>La demanda depende de la hora y el día de forma no lineal; el pico matutino solo existe entre semana.</td><td>Hora y mes con codificación cíclica; día de la semana como categoría.</td></tr>
+  <tr><td>Tendencia y quiebre COVID; los datos son una serie de tiempo.</td><td>Partición temporal (prueba desde 2025‑10); tabla de variables desde 2023‑01.</td></tr>
+  <tr><td>El 54.6 % de las estación‑horas no tiene salidas; los conteos están muy sesgados.</td><td>Conservar las horas en cero; log1p en los rezagos; pérdida Poisson/Tweedie en la Fase 2.</td></tr>
+  <tr><td>Demanda concentrada y estaciones con usos distintos (trabajo, residencia, ocio).</td><td>Codificar la estación por su demanda (target encoding) y por su perfil de uso (PCA).</td></tr>
+  <tr><td>Género y edad predicen débilmente las características del viaje y son datos personales.</td><td>Excluirlos del modelo; se usan solo conteos agregados.</td></tr>
+</table>
+
+<h3>Preprocesamiento de la tabla estación‑hora</h3>
+<p><code>features.py</code> construye una fila por estación y hora activa (12,180,583 filas, 486 estaciones, 32,856 horas), con dos objetivos (salidas y llegadas) y solo información conocida al pronosticar la noche anterior. <code>make_preprocessor</code> es un <code>ColumnTransformer</code> de scikit‑learn que se ajusta solo con la partición de entrenamiento:</p>
+<table>
+  <tr><th>Técnica</th><th>Columnas</th><th>Por qué</th></tr>
+  <tr><td>Target encoding con KFold (5)</td><td>Estación (~486 valores)</td><td>One‑hot agregaría ~486 columnas dispersas; el ajuste cruzado evita que una fila vea su propio objetivo.</td></tr>
+  <tr><td>One‑hot</td><td>Día de la semana (7)</td><td>Su efecto no es ordinal (laborable vs. fin de semana).</td></tr>
+  <tr><td>Seno / coseno</td><td>Hora, mes</td><td>Las 23:00 quedan junto a las 0:00 y diciembre junto a enero.</td></tr>
+  <tr><td>Imputación por mediana + log1p + StandardScaler</td><td>Demanda 2 y 7 días antes; media de la misma hora en 4 semanas</td><td>Conteos sesgados a la derecha; las horas previas a que abriera una estación son desconocidas, no cero.</td></tr>
+  <tr><td>Imputación por mediana + StandardScaler</td><td>Latitud, longitud, capacidad</td><td>3 estaciones con viajes no aparecen en la nomenclatura publicada.</td></tr>
+</table>
+
+<h3>Reducción de dimensionalidad: perfiles de uso con PCA</h3>
+<p>Cada estación se describe por la proporción de sus viajes en cada hora de la semana y en cada sentido (336 columnas), con datos de 2023‑01 a 2025‑09 y al menos 500 viajes (371 estaciones). Las proporciones se centran pero no se escalan, porque 15 columnas nocturnas no tienen varianza y escalarlas convertiría ruido en señal. <b>26 componentes explican el 90.1 % de la varianza</b>, una reducción de 13 veces, y los tres primeros son interpretables:</p>
+<ul>
+  <li><b>PC1 (28 %): destino vs. origen del commute.</b> Llegadas a las 8:00 y salidas a las 18:00 (zonas de trabajo y estudio, al centro‑poniente) frente al patrón inverso de las zonas residenciales.</li>
+  <li><b>PC2 (17 %): ocio de fin de semana.</b> Domingo de 10:00 a 13:00; correlación de 0.85 con la proporción de viajes en fin de semana, alineado con la Vía RecreActiva.</li>
+  <li><b>PC3 (11 %): estaciones emisoras netas.</b> Salidas en ambos picos: señala las que necesitan reabastecerse.</li>
+</ul>
+<figure><img src="figures/fase1/1.05_c20_6.png" alt="Mapa de componentes"><figcaption>Figura 4. Puntaje de cada estación en los tres primeros componentes sobre el mapa de la red (notebook 1.05). Con solo 4 semanas de historia, PC1 y PC2 reproducen el perfil completo (r = 0.92 y 0.95), así que 99 de las 102 estaciones abiertas después del ajuste pueden ubicarse sin reentrenar.</figcaption></figure>
+
+<h2><span class="n">4</span>Versionado de datos con MLflow</h2>
+<p>Los datos (~5 GB) no se guardan en Git; se versionan por contenido. Cada etapa es un run de MLflow que registra sus parámetros (el contrato de datos), sus métricas (filas leídas, eliminadas, imputadas) y sus datasets de entrada y salida, cada uno con un <b>digest calculado sobre los bytes de sus archivos</b>. Si el digest de salida de una etapa coincide con el de entrada de la siguiente, el linaje está completo; si cambia un dato o una regla, cambia el digest.</p>
+<table>
+  <tr><th style="width:12%">Etapa</th><th style="width:25%">Run</th><th style="width:21%">Entrada</th><th style="width:22%">Salida</th><th>Métricas clave</th></tr>
+  <tr><td>1 Extracción</td><td class="mono run">extract-raw-data</td><td>página de datos abiertos</td><td class="mono">mibici_raw 25643d10</td><td>143 archivos, 3.1 GB</td></tr>
+  <tr><td>2 Normalización</td><td class="mono run">normalize-raw-data</td><td class="mono">mibici_raw 25643d10</td><td class="mono">trips_interim 4d7eba9d<br>stations 5dac7f73</td><td>39,078,984 viajes; 484 estaciones</td></tr>
+  <tr><td>3 Limpieza</td><td class="mono run">clean-interim-trips</td><td class="mono">trips_interim 4d7eba9d<br>stations 5dac7f73</td><td class="mono">trips_processed 3cef612f</td><td>37,786,886 viajes; estrategias A/B/C</td></tr>
+  <tr><td>4 Variables</td><td class="mono run">build-station-hour-features</td><td class="mono">trips_processed 3cef612f</td><td class="mono">station_hour_features 47db7793</td><td>12,180,583 filas; 486 estaciones</td></tr>
+  <tr><td>5 Perfiles PCA</td><td class="mono run">fit-station-profiles</td><td class="mono">station_hour_features 47db7793</td><td class="mono">station_profiles c174ef70</td><td>371 × 26; 90.1 % de varianza</td></tr>
+</table>
+<p><b>Verificación.</b> Reprodujimos la cadena completa sobre el historial real: cada digest de entrada coincide con el de salida de la etapa anterior, y al forzar la re‑ejecución se obtienen los mismos digests. La prueba <code>tests/test_lineage.py</code> comprueba esa continuidad automáticamente. <b>Documentación de las modificaciones:</b> el manifiesto de descarga, el <code>cleaning_report.json</code> por mes, los parámetros de cada run, la tabla de linaje del README y la sección «Result → action» de cada notebook.</p>
+<div>
+  <figure class="w80"><img src="figures/fase1/mlflow-runs-crop.png" alt="Runs en MLflow"><figcaption>Figura 5. Experimento <code>mibici</code>: cada etapa con su dataset de entrada y su digest.</figcaption></figure>
+  <figure><img src="figures/fase1/mlflow-clean-run-crop.png" alt="Run de limpieza"><figcaption>Figura 6. Run <code>clean-interim-trips</code>: métricas de la limpieza y datasets de entrada y salida con sus digests.</figcaption></figure>
+</div>
+
+<h2><span class="n">5</span>Estructura y refactorización del código</h2>
+<p>El repositorio sigue la plantilla <b>Cookiecutter Data Science</b>: datos crudos, intermedios y procesados separados (fuera de Git), notebooks numerados, <code>references/</code>, <code>reports/</code>, pruebas y un paquete instalable. La lógica que nació en notebooks se movió a módulos con una responsabilidad cada uno; los notebooks importan esas funciones y solo explican y validan las decisiones, sin duplicar código.</p>
+<table>
+  <tr><th>Módulo</th><th>Responsabilidad</th></tr>
+  <tr><td class="mono">data/raw_data_extraction.py</td><td>Descarga idempotente y manifiesto con SHA‑256</td></tr>
+  <tr><td class="mono">data/raw_data_normalization.py</td><td>Detección de variantes, esquema único, Parquet mensual</td></tr>
+  <tr><td class="mono">data/interim_data_cleaning.py</td><td>Contrato de datos, limpieza, imputación y validación</td></tr>
+  <tr><td class="mono">data/trip_data.py · eda.py · plots.py</td><td>Carga de viajes y métricas; tablas y pruebas estadísticas del EDA; gráficas</td></tr>
+  <tr><td class="mono">features.py · station_profiles.py</td><td>Tabla estación‑hora y preprocesador; perfiles PCA</td></tr>
+  <tr><td class="mono">tracking.py · config.py</td><td>Runs de MLflow y digests de datasets; rutas y configuración por <code>.env</code></td></tr>
+</table>
+<p><b>Programación orientada a objetos donde es pertinente.</b> Usamos clases donde hay datos con identidad o estado: <code>RemoteFile</code> y <code>RawFile</code> son dataclasses inmutables que representan un archivo publicado y un archivo crudo clasificado (con su ruta de destino como propiedad); <code>CleaningLog</code> acumula lo que cada regla eliminó o cambió y se serializa como reporte; <code>SchemaError</code> y <code>ContractError</code> hacen explícitas las violaciones de esquema y de contrato. El preprocesamiento compone objetos de scikit‑learn (<code>Pipeline</code>, <code>ColumnTransformer</code>) con la interfaz <code>fit</code>/<code>transform</code>, que garantiza ajustar solo con entrenamiento. Las transformaciones sin estado se dejaron como funciones puras: son más fáciles de probar y de paralelizar por archivo.</p>
+<p><b>Calidad y operación.</b> Cada etapa tiene una CLI idempotente (<code>--help</code>, <code>--force</code>, <code>--no-track</code>; <code>--dry-run</code> en la extracción). El <code>Makefile</code> ofrece <code>make requirements</code>, <code>make data</code>, <code>make mlflow</code>, <code>make test</code> y <code>make lint</code>; las dependencias directas están fijadas en <code>requirements.txt</code> y la configuración local en <code>.env.example</code>. La suite de 163 pruebas con datos sintéticos y el lint con ruff pasan sobre <code>master</code>.</p>
+
+<h2><span class="n">6</span>Roles, actividades e interacción</h2>
+<table>
+  <tr><th style="width:17%">Integrante</th><th style="width:15%">Rol MLOps</th><th>Actividades en la Fase 1</th><th style="width:22%">Entrega a</th></tr>
+  <tr><td>Carlos Antonio Heinze Mortera</td><td>Data Engineer</td><td>Extracción automatizada, normalización de formatos, contrato de limpieza y EDA (issues #1, #3, #5; PR #2, #4, #6).</td><td>Datos crudos con manifiesto, intermedios y procesados; hallazgos del EDA → ML Engineer.</td></tr>
+  <tr><td>Javier Ramírez</td><td>ML / MLOps Engineer</td><td>ML Canvas, tabla estación‑hora y preprocesador, PCA, linaje de MLflow en las cinco etapas (issues #7–#10; PR #17–#20). Revisó y reprodujo el PR #6 antes de aprobarlo.</td><td>Variables y perfiles listos para modelar; linaje verificable → DevOps y QA.</td></tr>
+  <tr><td>Julián Malo Romero</td><td>DevOps / Reproducibilidad</td><td>Entorno Python 3.12, dependencias fijadas, <code>Makefile</code> con la canalización real, configuración de MLflow y verificación local (PR #21).</td><td>Entorno reproducible y comandos únicos → todo el equipo.</td></tr>
+  <tr><td>Carlos Arturo Chavero Cruz</td><td>QA y documentación</td><td>Validación de cifras contra las métricas de MLflow y las pruebas; revisión de la documentación y de la consistencia del entregable.</td><td>Informe ejecutivo validado → profesor.</td></tr>
+</table>
+<p><b>Cómo se alinean con el ciclo MLOps y cómo interactúan.</b> El trabajo sigue el flujo de GitHub: cada brecha detectada se convierte en un issue, cada issue en una rama y cada rama en un pull request revisado antes de integrarse a <code>master</code>. Entre etapas, el contrato no es un acuerdo verbal sino un artefacto verificable: el ingeniero de datos entrega datasets con digest y reporte de limpieza, el ingeniero de ML parte exactamente de ese digest y registra el suyo, DevOps fija el entorno con el que todos ejecutan, y QA compara lo reportado con lo que registran MLflow y las pruebas.</p>
+<div class="flow">
+  <div class="st"><b>Data Engineer</b>adquiere, normaliza y limpia<div class="d">processed 3cef612f</div></div><div class="ar">→</div>
+  <div class="st"><b>ML / MLOps Engineer</b>variables, PCA y linaje<div class="d">features · profiles</div></div><div class="ar">→</div>
+  <div class="st"><b>DevOps</b>entorno, Makefile, dependencias<div class="d">make data · test</div></div><div class="ar">→</div>
+  <div class="st"><b>QA y documentación</b>valida cifras y entregable<div class="d">MLflow · pytest</div></div>
+</div>
+<h3>Actividad en el repositorio </h3>
+<table>
+  <tr><th>Integrante</th><th>Usuario de GitHub</th><th class="num">Commits</th><th>Pull requests integrados</th></tr>
+<tr><td>Carlos Antonio Heinze Mortera</td><td>CarlosHeinze</td><td class='num'>15</td><td>#2, #4, #6</td></tr>
+<tr><td>Javier Ramírez</td><td>javieramirez90</td><td class='num'>20</td><td>#17, #18, #19, #20</td></tr>
+<tr><td>Julián Malo Romero</td><td>JulianMaloRomeroTEC</td><td class='num'>2</td><td>#21</td></tr>
+<tr><td>Carlos Arturo Chavero Cruz</td><td>chaverocarlos</td><td class='num'>0</td><td>—</td></tr>
+</table>
+
+<h2><span class="n">7</span>Conclusiones y reflexión</h2>
+<p><b>Lo que funcionó.</b> Definir un contrato de datos antes de limpiar hizo que cada regla tuviera una justificación medible y un conteo auditable. Mover la lógica de los notebooks a módulos con pruebas permitió reproducir el historial completo en dos equipos con totales idénticos. El linaje por digest convierte la trazabilidad en algo que se comprueba, no que se afirma.</p>
+<p><b>Áreas de mejora identificadas.</b></p>
+<ul>
+  <li>Registrar cada estrategia de faltantes como una versión separada del dataset en MLflow, no solo como métricas de comparación (issue #11).</li>
+  <li>Ampliar el uso de clases solo donde reduzca duplicación, por ejemplo una interfaz común para las etapas rastreadas (issue #14), y completar las salidas del notebook exploratorio 0.01 (issue #13).</li>
+  <li>Bloquear también las dependencias transitivas y usar un servidor de MLflow compartido; hoy cada integrante tiene su propio registro local.</li>
+  <li>Datos que faltan para la decisión real: inventario de bicicletas en vivo, historial de estaciones y capacidad, y clima.</li>
+</ul>
+<p><b>Siguiente fase.</b> Entrenar los baselines (naive estacional y promedio histórico), evaluarlos con backtest de origen móvil, comparar gradient boosting con pérdida de Poisson/Tweedie y registrar cada modelo en MLflow junto al digest de los datos con que se entrenó.</p>
+
+<h2><span class="n">8</span>Declaración de uso de inteligencia artificial</h2>
+<p>El equipo utilizó las siguientes herramientas de IA. Todo el código se revisó y ejecutó, y todas las cifras de este documento provienen de ejecutar ese código sobre los datos reales; ningún resultado fue generado por la IA sin esa ejecución. La responsabilidad final del contenido es del equipo.</p>
+<ul>
+  <li>OpenAI. (2026). <i>Codex</i> (agente de programación basado en la familia GPT‑6) [Modelo de lenguaje grande], utilizado para auditar el repositorio, identificar tareas pendientes, proponer cambios de reproducibilidad, redactar y revisar documentación y analizar resultados de pruebas. <a href="https://openai.com/codex/">https://openai.com/codex/</a></li>
+  <li>Anthropic. (2026). <i>Claude Code</i> (basado en Claude Opus 5.5) [Modelo de lenguaje grande], utilizado para generación y depuración de código y pruebas, refactorización, verificación de la reproducción con los datos reales, redacción de documentación y de este documento, y llenado del ML Canvas mediante Claude in Chrome. <a href="https://claude.com/claude-code">https://claude.com/claude-code</a></li>
+</ul>
+
+<h2>Referencias</h2>
+<div class="refs">
+  <p>MiBici. (2026). <i>Datos abiertos</i>. https://mibici.net/es/datos-abiertos/</p>
+  <p>Dorard, L. (2015). <i>Machine Learning Canvas</i> (v1.2). OWNML. https://www.ownml.co/</p>
+  <p>DrivenData. (2024). <i>Cookiecutter Data Science</i> (v2). https://cookiecutter-data-science.drivendata.org/</p>
+  <p>MLflow Project. (2026). <i>MLflow Tracking: datasets</i>. https://mlflow.org/docs/latest/</p>
+  <p>Pedregosa, F. et al. (2011). Scikit-learn: Machine Learning in Python. <i>Journal of Machine Learning Research</i>, 12, 2825–2830.</p>
+</div>
+
+</body>
+</html>

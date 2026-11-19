@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Entrega final · Equipo 02 · MiBici</title>
+<style>
+  /* Letter, the margins and the footer of the Phase 1 and 2 reports. The footer is CSS so the PDF
+     prints with Chrome or Edge headless alone (report.py pdf). */
+  @page {
+    size: Letter; margin: 15mm 16mm 17mm 16mm;
+    @bottom-left { content: "Entrega final · Equipo 02 · MiBici · TC5044.10"; font: 7pt Arial, sans-serif; color: #5b6875; }
+    @bottom-right { content: counter(page) " / " counter(pages); font: 7pt Arial, sans-serif; color: #5b6875; }
+  }
+  :root {
+    --ink: #1b2733; --muted: #5b6875; --accent: #0e6f68; --accent-soft: #e7f2f0;
+    --rule: #d5dfdd; --head: #15324d; --warn: #8a5a00; --warn-soft: #fbf3e2;
+  }
+  * { box-sizing: border-box; }
+  html, body { background: #fff; }
+  /* Avenir Next is macOS only; Windows falls back to Segoe UI, so page breaks differ by machine */
+  body { margin: 0; color: var(--ink); font: 9.4pt/1.45 "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+  a { color: var(--accent); text-decoration: none; }
+  p { margin: 0 0 6pt; }
+  ul { margin: 0 0 6pt; padding-left: 14pt; }
+  li { margin-bottom: 2pt; }
+  b, strong { font-weight: 600; color: var(--head); }
+  code { font: 8.3pt Menlo, Consolas, monospace; background: #f1f4f4; padding: 0 2pt; border-radius: 2pt; }
+
+  .kicker { font-size: 8pt; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+  h1 { font-size: 21pt; line-height: 1.15; color: var(--head); margin: 4pt 0 4pt; font-weight: 700; }
+  .subtitle { font-size: 11pt; color: var(--muted); margin-bottom: 8pt; }
+  .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 2pt 18pt; font-size: 8.6pt; color: var(--muted);
+          border-top: 2pt solid var(--accent); border-bottom: 1px solid var(--rule); padding: 6pt 0; margin-bottom: 10pt; }
+  .meta b { color: var(--ink); font-weight: 600; }
+  .team { display: grid; grid-template-columns: max-content max-content; gap: 0 14pt; margin-top: 1pt; color: var(--ink); }
+  .team span:nth-child(even) { font-variant-numeric: tabular-nums; color: var(--muted); }
+
+  h2 { font-size: 13pt; color: var(--head); margin: 14pt 0 6pt; padding-bottom: 3pt; border-bottom: 1px solid var(--rule);
+       break-after: avoid; }
+  h2 .n { color: var(--accent); margin-right: 4pt; }
+  h3 { font-size: 10pt; color: var(--head); margin: 9pt 0 3pt; break-after: avoid; }
+  .page-break { break-before: page; }
+
+  .summary { background: var(--accent-soft); border-left: 3pt solid var(--accent); padding: 8pt 10pt; margin: 0 0 8pt; }
+  .summary p:last-child { margin: 0; }
+  .keyfigs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6pt; margin: 6pt 0 2pt; }
+  .keyfigs div { background: #fff; border: 1px solid var(--rule); border-radius: 3pt; padding: 5pt 7pt; font-size: 8.3pt; color: var(--muted); }
+  .keyfigs b { display: block; font-size: 12.5pt; color: var(--head); }
+  .criterion { border: 1px solid var(--accent); border-radius: 3pt; padding: 5pt 8pt; margin: 4pt 0 8pt; background: #fbfdfc; }
+  .tag { display: inline-block; font-size: 6.8pt; font-weight: 700; letter-spacing: .06em; padding: 0 4pt; border-radius: 2pt;
+         border: 1px solid var(--accent); color: var(--accent); vertical-align: 1pt; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 8.4pt; margin: 4pt 0 8pt; break-inside: avoid; }
+  table.flowing { break-inside: auto; }
+  tr { break-inside: avoid; }
+  th { text-align: left; background: #e9f0ef; color: var(--head); font-weight: 600; padding: 4pt 5pt; border-bottom: 1px solid #b9c9c6; }
+  td { padding: 3.5pt 5pt; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tr.pick td { background: #f1f8f6; font-weight: 600; }
+  tr.base td { color: var(--muted); }
+  table.activity { font-size: 7.9pt; margin-bottom: 5pt; }
+  table.activity th:first-child { color: var(--accent); }
+  table.activity .note { font-size: 7pt; }
+  .mono { font: 7.3pt Menlo, Consolas, monospace; }
+  .mono.run { font-size: 7pt; white-space: nowrap; }
+
+  figure { margin: 6pt 0 9pt; break-inside: avoid; }
+  figure img { width: 100%; display: block; border: 1px solid var(--rule); }
+  figcaption { font-size: 7.9pt; color: var(--muted); margin-top: 3pt; }
+  figcaption > b.num-label, .figcap > b.num-label, .tabcap > b.num-label { color: var(--muted); font-weight: 600; }
+  figure.w80 img, figure.w80 figcaption { width: 82%; margin-left: auto; margin-right: auto; }
+  figure.w65 img, figure.w65 figcaption { width: 65%; margin-left: auto; margin-right: auto; }
+  figure.w60 img, figure.w60 figcaption { width: 60%; margin-left: auto; margin-right: auto; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10pt; align-items: start; }
+
+  /* ML Canvas (Phase 1) */
+  .canvas { display: grid; grid-template-columns: repeat(5, 1fr); grid-auto-rows: auto; gap: 4pt; font-size: 7.5pt; line-height: 1.33;
+            margin: 6pt 0 4pt; break-inside: avoid; }
+  .canvas div { border: 1px solid #b9c9c6; border-radius: 3pt; padding: 4pt 5pt; background: #fbfdfc; }
+  .canvas h4 { margin: 0 0 2pt; font-size: 7.4pt; letter-spacing: .05em; text-transform: uppercase; color: var(--accent); }
+  .canvas .vp { grid-row: span 2; background: var(--accent-soft); }
+  .canvas .mon { grid-column: span 5; }
+
+  /* flow diagrams (Phases 1 and 2) */
+  .flow { display: flex; align-items: stretch; gap: 0; margin: 6pt 0 8pt; break-inside: avoid; }
+  .flow .st { flex: 1; border: 1px solid #b9c9c6; border-radius: 3pt; padding: 4pt 5pt; font-size: 7.6pt; line-height: 1.3; background: #fbfdfc; }
+  .flow .st b { display: block; font-size: 8pt; }
+  .flow .st .d { font: 7pt Menlo, Consolas, monospace; color: var(--accent); }
+  .flow .ar { align-self: center; color: var(--accent); font-size: 11pt; padding: 0 2pt; }
+
+  /* solution diagram: stages by phase, the tools of each, and what runs across all of them */
+  .arch { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4pt 9pt; margin: 6pt 0 4pt; font-size: 7.4pt; line-height: 1.3; break-inside: avoid; }
+  .arch .lane { grid-column: span 2; text-align: center; font-size: 7.4pt; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+                color: #fff; background: var(--accent); border-radius: 3pt; padding: 2pt; }
+  .arch .box { border: 1px solid #b9c9c6; border-radius: 3pt; padding: 4pt 5pt; background: #fbfdfc; position: relative; }
+  .arch .box b { display: block; font-size: 8pt; }
+  .arch .box .t { display: block; margin-top: 2pt; font: 6.8pt Menlo, Consolas, monospace; color: var(--accent); }
+  .arch .box:not(.last)::after { content: "→"; position: absolute; right: -9pt; top: 40%; width: 9pt; text-align: center; color: var(--accent); font-size: 9pt; }
+  .arch .bar { border: 1px dashed var(--accent); border-radius: 3pt; padding: 3pt 6pt; background: var(--accent-soft); }
+  .arch .bar b { color: var(--accent); }
+  .arch .user { border: 1.5px solid var(--head); border-radius: 3pt; padding: 3pt 6pt; background: #fff; }
+  .span2 { grid-column: span 2; } .span3 { grid-column: span 3; } .span4 { grid-column: span 4; } .span6 { grid-column: span 6; }
+
+  .note { font-size: 8pt; color: var(--muted); }
+  .refs { font-size: 8pt; color: var(--muted); }
+  .refs p { margin-bottom: 3pt; padding-left: 12pt; text-indent: -12pt; }
+
+  /* Pending content. report.py check lists every one; none can be left in the delivered PDF. */
+  .todo { background: #fff4d6; border-left: 3pt solid #d08a00; padding: 4pt 7pt; margin: 4pt 0 8pt; color: #7a4b00; font-size: 8.4pt; }
+  span.todo { display: inline; padding: 0 3pt; margin: 0; border-left: 0; }
+</style>
+</head>
+<body>
+
+<div class="kicker">Tecnológico de Monterrey · Maestría en Inteligencia Artificial Aplicada · TC5044.10 Operaciones de Aprendizaje Automático</div>
+<h1>MiBici: del dato abierto a un servicio de pronóstico reproducible y monitoreado</h1>
+<div class="subtitle">Entrega final · Integración de las fases 1 a 3 · Equipo 02</div>
+<div class="meta">
+  <div>
+    <b>Integrantes</b>
+    <div class="team">
+      <span>Javier Ramírez</span><span>A01797453</span>
+      <span>Carlos Antonio Heinze Mortera</span><span>A01700179</span>
+      <span>Julián Malo Romero</span><span>A01797459</span>
+      <span>Carlos Arturo Chavero Cruz</span><span>A01797583</span>
+    </div>
+  </div>
+  <div>
+    <div><b>Fecha:</b> 22 de noviembre de 2026</div>
+    <div><b>Repositorio:</b> <a href="https://github.com/CarlosHeinze/MLOps_Team2">github.com/CarlosHeinze/MLOps_Team2</a></div>
+    <div><b>Imagen Docker:</b> <a href="https://hub.docker.com/r/racj90120hplmnv09/mibici-ml-service">hub.docker.com/r/racj90120hplmnv09/mibici-ml-service</a> <span class="todo">versión final del tag</span></div>
+    <div><b>Datos:</b> <a href="https://mibici.net/es/datos-abiertos/">mibici.net/es/datos-abiertos</a>, dic 2014 – sep 2026</div>
+    <!-- Optional: the final instructions do not ask for a video.
+    <div><b>Video:</b> <a href="…">…</a></div> -->
+  </div>
+</div>
+
+<div class="summary" id="resumen">
+  <p class="todo">Resumen ejecutivo (se escribe al final, ~150 palabras): el problema del operador, qué construimos en cada fase y el resultado que lo prueba (criterio de éxito del campeón, servicio en Docker Hub, reproducción en entorno limpio, detección de drift). Ver el resumen de <code>references/fase2.html</code>.</p>
+  <div class="keyfigs">
+    <div><b>37.8 M</b>viajes limpios de 142 archivos mensuales, con linaje por digest (Fase 1)</div>
+    <div><b>−15.4 % / −15.1 %</b>WAPE en hora pico del campeón frente al mejor baseline (salidas / llegadas, Fase 2)</div>
+    <div><b><span class="todo">N pruebas</span></b><span class="todo">unitarias y de integración con <code>pytest -q</code></span></div>
+    <div><b><span class="todo">…</span></b><span class="todo">servicio FastAPI: misma predicción que el batch</span></div>
+    <div><b><span class="todo">…</span></b><span class="todo">imagen Docker multi‑arquitectura: tamaño y tags</span></div>
+    <div><b><span class="todo">…</span></b><span class="todo">reproducibilidad o drift: la cifra que lo demuestra</span></div>
+  </div>
+</div>
+
+<h2 id="introduccion"><span class="n">1</span>Introducción</h2>
+
+<h3>1.1 La problemática y el ML Canvas</h3>
+<p class="todo">Rúbrica «Acercamiento inicial» y «Análisis del problema» (15 + 15). El problema del operador con los datos que lo demuestran (flujos unidireccionales, estaciones que se vacían en un día, demanda concentrada y predecible), la propuesta de valor y por qué ML y no una regla. Fuente: sección 1 de <code>references/fase1.html</code> y <code>references/ml-canvas.md</code>.</p>
+<div class="canvas">
+  <div><h4>Tarea de predicción</h4>Pronóstico multiserie de conteos. Entidad: estación‑hora (~480 estaciones activas). Salidas y llegadas en cada una de las próximas 24 h; flujo neto = llegadas − salidas.</div>
+  <div><h4>Decisiones</h4>Cada noche y a las ~13:00: bicicletas proyectadas = actuales + flujo neto acumulado. Se marcan estaciones bajo un mínimo o sobre capacidad − margen, se priorizan por viajes no atendidos y se planean rutas de camiones.</div>
+  <div class="vp"><h4>Propuesta de valor</h4>Beneficiario: equipo de redistribución de MiBici; indirectamente, los usuarios.<br><br>Dolor: flujos unidireccionales que vacían o llenan estaciones en horas.<br><br>Integración: lista o tablero nocturno de estaciones a surtir o vaciar, con hora y cantidad esperadas.</div>
+  <div><h4>Recolección de datos</h4>142 CSV mensuales descargados de forma idempotente con manifiesto SHA‑256. Cada mes nuevo se normaliza, valida y limpia; cada versión queda en MLflow. Las etiquetas llegan solas: los viajes del mes siguiente.</div>
+  <div><h4>Fuentes de datos</h4>Datos abiertos MiBici: viajes y nomenclatura actual (484 estaciones, capacidad). Candidatas: clima, festivos, calendario escolar. Faltan: inventario en vivo e historial de estaciones.</div>
+  <div><h4>Simulación de impacto</h4>Backtest con origen móvil en los últimos 12 meses contra naive estacional y promedio histórico: MAE, WAPE, devianza de Poisson. Criterio: WAPE ≥ 10 % menor en horas pico, sin grupo de estaciones peor que el baseline.</div>
+  <div><h4>Hacer predicciones</h4>Batch nocturno (~23:00) para las próximas 24 h, refresco opcional a mediodía. ~480 × 24 ≈ 11.5 mil pronósticos por corrida, en segundos. <span class="todo">agregar el servicio en línea (FastAPI en Docker), Canvas §5</span></div>
+  <div><h4>Construcción de modelos</h4>Un modelo global por objetivo: primero baselines, luego gradient boosting con pérdida Poisson/Tweedie. Reentrenamiento mensual o ante drift, con partición temporal. Cada corrida en MLflow. <span class="todo">reproducibilidad y tolerancias, Canvas §8</span></div>
+  <div><h4>Variables</h4>Estación: target encoding, ubicación, capacidad, perfiles PCA. Tiempo: hora y mes en seno/coseno, día de la semana one‑hot. Historial: demanda 2 y 7 días antes y media de 4 semanas. Sin género ni edad.</div>
+  <div class="mon"><h4>Monitoreo</h4>Datos: contrato en cada mes nuevo; drift de volumen, perfil horario y estaciones nuevas. Modelo: WAPE y MAE mensual por estación contra el baseline, con alerta si deja de superarlo. Negocio: estación‑horas sin bicicletas o sin anclajes y km de camión por bicicleta redistribuida. <span class="todo">umbrales, alertas y acciones de drift de la Fase 3, Canvas §10</span></div>
+</div>
+<p class="note figcap" id="fig-canvas">Machine Learning Canvas v1.2 (Dorard) del proyecto, condensado; el completo está en <code>references/ml-canvas.md</code>.</p>
+
+<h3>1.2 Por qué MLOps</h3>
+<p class="todo">Contextualización y justificación del uso de MLOps para este problema: un modelo que se reentrena cada mes con datos nuevos, que debe servirse cada noche y cuyo desempeño cambia con la red (~100 estaciones nuevas en 2026). Qué riesgo cubre cada práctica (versionado y linaje, tracking, registry, pruebas, contenedor, reproducibilidad, monitoreo de drift), citando la deuda técnica oculta (Sculley et al., 2015) y la definición de MLOps (Kreuzberger et al., 2023).</p>
+
+<h3>1.3 Diagrama de la solución</h3>
+<div class="arch">
+  <div class="lane">Fase 1 · Datos</div><div class="lane">Fase 2 · Modelos</div><div class="lane">Fase 3 · Despliegue y monitoreo</div>
+  <div class="box"><b>Adquisición y normalización</b>142 CSV mensuales → Parquet con esquema único y manifiesto SHA‑256<span class="t">requests · pandas · pyarrow</span></div>
+  <div class="box"><b>Limpieza, EDA y variables</b>contrato de datos, tabla estación‑hora, perfiles PCA<span class="t">pandas · scikit‑learn</span></div>
+  <div class="box"><b>Entrenamiento y ajuste</b>2 baselines, 5 candidatos, búsqueda aleatoria con validación temporal<span class="t">scikit‑learn · LightGBM</span></div>
+  <div class="box"><b>Evaluación y registro</b>backtest de 12 meses; alias <code>champion</code> en el Registry<span class="t">MLflow Model Registry</span></div>
+  <div class="box"><b>Serving</b><code>POST /predict</code> con esquemas validados, en una imagen Docker publicada<span class="t">FastAPI · Pydantic · Docker</span></div>
+  <div class="box last"><b>Monitoreo</b><span class="todo">drift: escenarios, umbrales y alertas (#42)</span><span class="t">notebook 3.03</span></div>
+  <div class="bar span6"><b>MLflow Tracking</b> · un run por etapa con sus datasets y digests, parámetros, métricas y artefactos; corrida <code>snapshot</code> con las tablas y salidas de referencia</div>
+  <div class="bar span6"><b>Ingeniería</b> · Cookiecutter Data Science · paquete <code>team2_mlops2026</code> con CLIs (typer) · <code>Makefile</code> · <code>pytest</code> y ruff · dependencias fijadas con <code>requirements-lock.txt</code> · GitHub: issue → rama → PR revisado</div>
+  <div class="user span3"><b>Pronóstico batch nocturno</b> (<code>make predict</code>): 24 h por estación desde <code>models:/mibici-&lt;objetivo&gt;@champion</code></div>
+  <div class="user span3"><b>Equipo de redistribución</b>: lista de estaciones a surtir o vaciar; consultas en línea a la API</div>
+</div>
+<p class="note figcap" id="fig-solucion">Componentes y herramientas de la solución por fase. <span class="todo">revisar contra el pipeline final del README (#43)</span></p>
+
+<h2 id="actividades"><span class="n">2</span>Actividades realizadas en cada fase</h2>
+<p class="todo">Rúbrica «Actividades y tareas por rol» (20). Una línea por fase: qué se pidió, qué se entregó y con qué evidencia. El detalle de los métodos va en la sección 3 y el de los roles en la 4.</p>
+<table class="flowing">
+  <tr><th style="width:10%">Fase</th><th style="width:13%">Fechas (2026)</th><th>Actividades</th><th style="width:15%">Issues</th><th style="width:15%">Pull requests</th></tr>
+  <tr><td>1 · Datos</td><td>21 – 25 oct</td><td>ML Canvas; extracción, normalización y limpieza con contrato de datos; EDA; tabla estación‑hora y preprocesador; perfiles PCA; versionado de las cinco etapas en MLflow; estructura Cookiecutter y refactorización.</td><td>#1 – #16</td><td>#2, #4, #6, #17 – #21</td></tr>
+  <tr><td>2 · Modelos</td><td>26 oct – 8 nov</td><td>Métricas y criterio de éxito; baselines y cinco candidatos; ajuste de hiperparámetros; backtest de 12 meses y ablación de PCA; Model Registry con alias; pronóstico batch; <code>make pipeline</code>.</td><td>#22 – #29</td><td>#30 – #37</td></tr>
+  <tr><td>3 · Despliegue</td><td>9 – 22 nov</td><td>Pruebas unitarias y de integración; servicio FastAPI; imagen Docker en Docker Hub; reproducibilidad en entorno limpio; <span class="todo">drift, integración del Makefile y README, reporte; nice‑to‑have hechos</span></td><td>#38 – #49</td><td>#50 – <span class="todo">…</span></td></tr>
+</table>
+
+<h2 id="metodos"><span class="n">3</span>Métodos y resultados por etapa</h2>
+<p class="todo">Rúbrica «Métodos y técnicas» (20) y «Resultados» (15). Cada subsección: el método, por qué se eligió frente a las alternativas, el resultado con su fuente (run de MLflow, notebook, comando) y la decisión que tomamos. Las fases 1 y 2 se condensan desde los reportes entregados (mismas cifras y figuras de <code>reports/figures/fase1|fase2</code>); la fase 3 va con más detalle.</p>
+
+<h3>3.1 Datos: adquisición, limpieza y versionado (Fase 1)</h3>
+<p class="todo">Del reporte de la Fase 1: flujo de las cinco etapas con sus digests, contrato de limpieza (tabla de reglas), experimento de las estrategias A/B/C de faltantes y linaje en MLflow.</p>
+
+<h3>3.2 Exploración, variables y PCA (Fase 1)</h3>
+<p class="todo">Hallazgos del EDA → decisiones; preprocesador (<code>ColumnTransformer</code>); perfiles PCA (26 componentes, 90.1 %). Una figura de la Fase 1.</p>
+
+<h3>3.3 Modelos: entrenamiento, ajuste, evaluación y registro (Fase 2)</h3>
+<p class="todo">Del reporte de la Fase 2: selección de algoritmos, tabla contra los baselines, ajuste, backtest de 12 meses (tabla 2), decisión del campeón, ablación de PCA, Model Registry y pronóstico batch. Una o dos figuras de la Fase 2.</p>
+
+<h3>3.4 Pruebas unitarias y de integración</h3>
+<p class="todo">Qué se prueba por módulo (preprocesamiento, métricas, inferencia, serving, reproducibilidad), la prueba de integración extremo a extremo con datos sintéticos (marca <code>integration</code>), el comando único <code>make test</code> / <code>pytest -q</code> y su salida (número de pruebas y tiempo).</p>
+
+<h3>3.5 Serving con FastAPI</h3>
+<p class="todo">Endpoints (<code>POST /predict</code>, <code>GET /health</code>, <code>GET /model</code>), validación con Pydantic y códigos de error, ejemplo de request y response, URIs y versiones de los modelos servidos, captura del Swagger y la comparación con el batch (notebook 3.01).</p>
+
+<h3>3.6 Contenedor Docker y Docker Hub</h3>
+<p class="todo">Decisiones del Dockerfile (multi‑stage, base fijada por digest, usuario no root, HEALTHCHECK, modelos dentro de la imagen), comandos exactos de build y run, tags publicados, tamaño, arquitecturas y captura de Docker Hub.</p>
+
+<h3>3.7 Reproducibilidad en un entorno limpio</h3>
+<p class="todo">Dependencias fijadas (lock), semillas, artefactos versionados (corrida snapshot), métricas de referencia contra reproducidas en cada entorno (contenedor limpio y la máquina de otro integrante), tolerancias y por qué LightGBM no es bit a bit entre números de hilos. Fuentes: <code>docs/verificacion-fase3.md</code>, notebook 3.02.</p>
+
+<h3>3.8 Data drift y pérdida de desempeño</h3>
+<p class="todo">Escenarios sintéticos, estadísticas de drift, métricas contra la línea base, umbrales, alertas y acción propuesta, con figuras del notebook 3.03 (#42).</p>
+
+<h2 id="roles"><span class="n">4</span>Roles, interacción y actividad en GitHub</h2>
+<p class="todo">Rúbrica «Actividades y tareas por rol» (20): las actividades de cada rol en cada fase y cómo se alinean con el ciclo MLOps. Confirma con cada integrante su columna de la Fase 3 antes de entregar.</p>
+<table>
+  <tr><th style="width:17%">Integrante</th><th style="width:19%">Fase 1</th><th style="width:28%">Fase 2</th><th>Fase 3</th></tr>
+  <tr><td>Carlos Antonio Heinze Mortera</td><td><b>Data Engineer.</b> Extracción, normalización, contrato de limpieza y EDA.</td><td><b>ML Engineer.</b> Planeó los issues #22–#29; métricas y folds, baselines, candidatos y ajuste; rediseñó el procesamiento cuando la primera versión no superó al baseline.</td><td><span class="todo">rol y actividades</span></td></tr>
+  <tr><td>Javier Ramírez</td><td><b>ML / MLOps Engineer.</b> ML Canvas, tabla estación‑hora, PCA y linaje en MLflow.</td><td><b>MLOps Engineer.</b> Reproducción en un segundo equipo, backtest y ablación, Model Registry, pronóstico batch y <code>make pipeline</code>.</td><td><span class="todo">rol y actividades</span></td></tr>
+  <tr><td>Julián Malo Romero</td><td><b>DevOps.</b> Entorno Python 3.12, dependencias, <code>Makefile</code> y verificación en Windows.</td><td><b>DevOps y documentación.</b> Reporte ejecutivo y video; verificación de cifras contra MLflow.</td><td><span class="todo">rol y actividades</span></td></tr>
+  <tr><td>Carlos Arturo Chavero Cruz</td><td><b>QA y documentación.</b> Validación de cifras contra MLflow y las pruebas.</td><td><b>QA y documentación.</b> Reporte ejecutivo y video de la fase.</td><td><span class="todo">rol y actividades</span></td></tr>
+</table>
+<p class="todo">Cómo interactúan: el flujo issue → rama → PR revisado → <code>master</code>, y las entregas entre roles como artefactos comprobables (digests, runs, alias del Registry, imagen con tag, set de referencia). Un diagrama <code>.flow</code> como el de las fases 1 y 2.</p>
+<h3>Actividad en el repositorio</h3>
+<!-- activity:start --><!-- activity:empty -->
+<p class="todo">Ejecuta <code>report.py activity</code> para generar la tabla de commits, PR, revisiones e issues de cada integrante por fase.</p>
+<!-- activity:end -->
+
+<h2 id="conclusiones"><span class="n">5</span>Conclusiones generales</h2>
+<p class="todo">Rúbrica «Conclusiones y reflexión final» (15): lecciones aprendidas en el proyecto completo (no solo la Fase 3), puntos de mejora identificados y las estrategias que usamos para resolver el caso, trabajo futuro y recomendaciones. Retoma las áreas de mejora de las fases 1 y 2 y di cuáles se resolvieron.</p>
+<p><b>Lecciones aprendidas.</b> <span class="todo">…</span></p>
+<p><b>Puntos de mejora.</b> <span class="todo">…</span></p>
+<p><b>Trabajo futuro y recomendaciones.</b> <span class="todo">…</span></p>
+
+<h2 id="ia"><span class="n">6</span>Declaración de uso de inteligencia artificial</h2>
+<p>El equipo utilizó las siguientes herramientas de IA. Todo el código se revisó y ejecutó, y todas las cifras de este documento provienen de ejecutar ese código sobre los datos reales; ningún resultado fue generado por la IA sin esa ejecución. La responsabilidad final del contenido es del equipo.</p>
+<p class="todo">Una entrada en formato APA por herramienta, con su propósito y alcance en las tres fases, tomada de <code>docs/ai-usage.md</code> (actualizado con la Fase 3) y confirmada con cada integrante.</p>
+
+<h2 id="referencias">Referencias</h2>
+<p class="todo">Deja solo las referencias citadas en el texto y agrega las que cites nuevas.</p>
+<div class="refs">
+  <p>Bergstra, J. y Bengio, Y. (2012). Random search for hyper-parameter optimization. <i>Journal of Machine Learning Research</i>, 13, 281–305.</p>
+  <p>Docker Inc. (2026). <i>Docker documentation</i>. https://docs.docker.com/</p>
+  <p>Dorard, L. (2015). <i>Machine Learning Canvas</i> (v1.2). OWNML. https://www.ownml.co/</p>
+  <p>DrivenData. (2024). <i>Cookiecutter Data Science</i> (v2). https://cookiecutter-data-science.drivendata.org/</p>
+  <p>Gama, J., Žliobaitė, I., Bifet, A., Pechenizkiy, M. y Bouchachia, A. (2014). A survey on concept drift adaptation. <i>ACM Computing Surveys</i>, 46(4), 1–37.</p>
+  <p>Huyen, C. (2022). <i>Designing machine learning systems: An iterative process for production-ready applications</i>. O'Reilly Media.</p>
+  <p>Hyndman, R. J. y Athanasopoulos, G. (2021). <i>Forecasting: Principles and practice</i> (3.ª ed.). OTexts. https://otexts.com/fpp3/</p>
+  <p>Ke, G. et al. (2017). LightGBM: A highly efficient gradient boosting decision tree. <i>Advances in Neural Information Processing Systems</i>, 30.</p>
+  <p>Kreuzberger, D., Kühl, N. y Hirschl, S. (2023). Machine learning operations (MLOps): Overview, definition, and architecture. <i>IEEE Access</i>, 11, 31866–31879.</p>
+  <p>MiBici. (2026). <i>Datos abiertos</i>. https://mibici.net/es/datos-abiertos/</p>
+  <p>MLflow Project. (2026). <i>MLflow Tracking</i> y <i>MLflow Model Registry</i>. https://mlflow.org/docs/latest/</p>
+  <p>Pedregosa, F. et al. (2011). Scikit-learn: Machine learning in Python. <i>Journal of Machine Learning Research</i>, 12, 2825–2830.</p>
+  <p>Ramírez, S. (2026). <i>FastAPI</i>. https://fastapi.tiangolo.com/</p>
+  <p>Sculley, D. et al. (2015). Hidden technical debt in machine learning systems. <i>Advances in Neural Information Processing Systems</i>, 28.</p>
+  <p>Treveil, M. et al. (2020). <i>Introducing MLOps: How to scale machine learning in the enterprise</i>. O'Reilly Media.</p>
+</div>
+
+<script>
+  // Numbers figures and tables in the order they appear, so sections can be written in any order.
+  // A figure caption is a <figcaption> or a <p class="note figcap">; a table caption is a
+  // <p class="note tabcap"> after its table. Captions carry no number of their own. Refer to one
+  // with an empty link of class xref to its id; the id goes on the <figure> or on the caption.
+  (() => {
+    const label = { fig: "Figura", tab: "Tabla" };
+    const count = { fig: 0, tab: 0 };
+    const numbers = {};
+    document.querySelectorAll("figcaption, .figcap, .tabcap").forEach((caption) => {
+      const kind = caption.classList.contains("tabcap") ? "tab" : "fig";
+      const text = `${label[kind]} ${++count[kind]}`;
+      const id = caption.id || caption.closest("figure")?.id;
+      if (id) numbers[id] = text;
+      caption.insertAdjacentHTML("afterbegin", `<b class="num-label">${text}.</b> `);
+    });
+    document.querySelectorAll("a.xref").forEach((ref) => {
+      const text = numbers[ref.getAttribute("href").slice(1)];
+      ref.textContent = text || "¿referencia?";
+      if (!text) ref.classList.add("todo");
+    });
+  })();
+</script>
+</body>
+</html>

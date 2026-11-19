@@ -524,8 +524,9 @@ VS Code (Ports tab) or run the server on a shared VM.
 │
 ├── pyproject.toml     <- Package metadata, pytest, coverage and ruff configuration
 ├── references         <- ml-canvas.md: requirements analysis and value proposition
-├── reports
-│   └── figures        <- Figures for reports and presentations
+├── reports            <- Delivered reports (Fase1_Equipo02.pdf, Fase2_Equipo02.pdf) and the
+│   │                     final one, written with the final-report skill (.claude/skills/)
+│   └── figures        <- Figures of the reports, one folder per phase (fase1, fase2, fase3)
 ├── requirements.txt   <- Python dependencies (installs this package with `-e .`)
 ├── requirements-serving.txt <- The pinned subset for the service, the image and the logged models
 ├── requirements-lock.txt    <- Every package at its version, transitive ones too (make lock)
