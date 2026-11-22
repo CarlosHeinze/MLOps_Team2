@@ -380,9 +380,34 @@ time.
   - the hourly and weekday profile
   - new or unknown station ids
   - the missing-gender rate
-- **Model:** forecast error (WAPE and MAE) per month and per station, compared with the
-  seasonal-naive baseline. An alert fires when the model stops beating the baseline or when its
-  error rises more than an agreed threshold over its backtest value.
+- **Reference and replay:** the frozen, served champions score held-out October 2025 as the
+  monitoring validation set. The original tuning validation months (July–September 2025)
+  entered the final fit. November 2025 supplies a separate control for the simulations.
+  September 2026 is replayed as observed and includes a segment for IDs first observed from
+  May 2026. Both baselines and station groups use only the training window recorded in the
+  model card. Compare each run with the reference and with the best baseline on that window.
+- **Distribution:** compute feature and forecast PSI with reference deciles, a missing-value
+  bin and explicit tails. Use categorical shares for weekday, hour and station ID. PSI
+  ≥ 0.10 warns and ≥ 0.25 alerts. These are screening thresholds for moderate and large share
+  shifts. KS (D) and p-values describe the shift among observed numeric values. Repeated
+  station-hours and discrete counts limit p-value interpretation. Month encodings and demand
+  labels are reported for context. A different month changes the encodings by construction.
+- **Input quality:** a rise of ≥ 10 percentage points in any monitored feature's missing
+  rate or ≥ 10% of rows with IDs unseen in training triggers a contract and pipeline review.
+  These initial thresholds tolerate isolated missing inputs and flag failures affecting a
+  substantial share of forecasts. The report also gives the share of distinct unknown IDs.
+- **Performance:** track overall and peak WAPE, MAE, group daily WAPE and imbalance decision
+  precision/recall. Alert when peak WAPE exceeds the Phase 2 backtest mean plus two standard
+  deviations (0.604 departures, 0.561 arrivals), or when improvement against the best
+  same-window baseline drops below the Phase 2 success floor of 10%. The two-standard-deviation
+  limits use the observed monthly variation as an operational tolerance. Pilot calibration on
+  past windows is needed before using these initial limits for live decisions.
+- **Response:** severity and quality alarms are reported separately from measured loss. The
+  latter requires an adverse change against the paired control (against validation for a
+  historical replay) and failure of the corresponding performance threshold. Investigate
+  input quality first. With drift and confirmed loss, consider `make train tune evaluate register`
+  and promote only a candidate that passes the backtest. With drift and stable performance,
+  keep monitoring. With a performance alarm alone, review forecasts, labels and the baseline.
 - **Business (with operator data):** station-hours with no bikes or no free docks, and
   kilometers driven by the rebalancing trucks, compared before and after adoption.
 

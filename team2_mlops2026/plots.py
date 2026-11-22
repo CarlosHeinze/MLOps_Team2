@@ -546,3 +546,59 @@ def plot_importance(importance: pd.DataFrame, title: str, top: int = 15) -> plt.
     ax.grid(axis="y", visible=False)
     fig.tight_layout()
     return fig
+
+
+def plot_drift_distribution(reference, monitoring, feature: str) -> plt.Figure:
+    """Overlay comparable empirical CDFs and report the missing shares in the legend."""
+    fig, ax = plt.subplots(figsize=(7, 3.6), layout="constrained")
+    for values, name in ((reference, "Reference"), (monitoring, "Monitoring")):
+        missing = values.isna().mean()
+        values = np.sort(values.dropna().to_numpy())
+        label = f"{name} ({missing:.1%} missing)"
+        if len(values):
+            x, counts = np.unique(values, return_counts=True)
+            if len(x) > 1:
+                ax.step(x, np.cumsum(counts) / len(values), where="post", label=label)
+            else:
+                ax.axvline(x[0], label=label)
+        else:
+            ax.plot([], [], label=label)
+    ax.set(
+        title=f"Distribution of {feature}",
+        xlabel=feature,
+        ylabel="Cumulative share",
+        ylim=(0, 1.04),
+    )
+    ax.legend()
+    return fig
+
+
+def plot_feature_psi(values: pd.Series, warning: float, alert: float) -> plt.Figure:
+    """Per-variable PSI with its two monitoring boundaries."""
+    values = values.sort_values()
+    fig, ax = plt.subplots(figsize=(8, 2 + len(values) * 0.25), layout="constrained")
+    ax.barh(values.index, values, color=SERIES[0])
+    ax.axvline(warning, color=SERIES[1], linestyle="--", label=f"Warning ≥ {warning:g}")
+    ax.axvline(alert, color=INK, linestyle=":", label=f"Alert ≥ {alert:g}")
+    ax.set(title="Reference vs. monitoring", xlabel="Population Stability Index (PSI)")
+    ax.legend()
+    return fig
+
+
+def plot_drift_performance(scenario, points, reference, limits) -> plt.Figure:
+    """Peak WAPE against scenario severity for both targets and the best baseline."""
+    fig, axes = plt.subplots(1, len(limits), figsize=(10, 3.5), layout="constrained")
+    severities = sorted(points)
+    for target, ax in zip(limits, axes):
+        metrics = [points[severity][target] for severity in severities]
+        ax.plot(severities, [m["peak_wape"] for m in metrics], "o-", label="Champion")
+        ax.plot(
+            severities, [m["baseline_peak_wape"] for m in metrics], "s-", label="Best baseline"
+        )
+        ax.axhline(reference[target]["peak_wape"], color=MUTED, linestyle="--", label="Reference")
+        ax.axhline(limits[target], color=INK, linestyle=":", label="Alert limit")
+        ax.set(title=target.capitalize(), xlabel="Severity", ylabel="Peak WAPE")
+        ax.xaxis.set_major_formatter(mpl.ticker.PercentFormatter(xmax=1))
+    axes[0].legend()
+    fig.suptitle(scenario.replace("-", " ").capitalize())
+    return fig

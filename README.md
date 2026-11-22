@@ -43,6 +43,7 @@ reads only the previous step's output, so any step can be re-run on its own.
 | 13. Online serving | `team2_mlops2026.serving.app` (FastAPI) | `POST /predict`, `GET /health` and `GET /model` on port 8000; schema in `docs/api/` | `3.01` |
 | 14. Container | `Dockerfile` (`make docker-build`, `make docker-push`) | Image [`racj90120hplmnv09/mibici-ml-service`](https://hub.docker.com/r/racj90120hplmnv09/mibici-ml-service) on Docker Hub, for amd64 and arm64 | — |
 | 15. Reproducibility | `team2_mlops2026.modeling.reproducibility` (`make snapshot`, `make reproduce`) | `snapshot-<digest>` run with the champions' tables and reference outputs, `tests/data/reference.json`, `reproduce-<model>` runs | `3.02` |
+| 16. Drift monitoring | `team2_mlops2026.monitoring` (`make monitor`) | `data/processed/mibici/monitoring/` and one `drift-<scenario>-<severity>` MLflow run per case | `3.03` |
 
 Every step except the exploratory analysis is tracked in MLflow (see
 [Data versioning](#data-versioning) and [MLflow](#mlflow-comparing-runs-and-the-model-registry)).
@@ -374,10 +375,29 @@ reference request still fits the API and that the reference is the documented ex
 `models/` holds the reference versions (`make export` or `make docker-models`), it also checks
 that they give the golden forecasts; otherwise that one test is skipped.
 
-### 8. Notebooks
+### 8. Drift monitoring
+
+Use the station-hour features and profiles from the team snapshot and both exported champions.
+The default uses October 2025 as held-out validation for monitoring, November 2025 as the
+source for the simulations, and September 2026 for the unmodified historical replay. The
+baselines and the station demand groups use the models' recorded training window.
+
+```bash
+make monitor
+make monitor MONITOR_ARGS="--no-track --scenario missing-features --severity 0.10 --severity 0.25 --severity 0.50"
+make monitor MONITOR_ARGS="--no-track --scenario real --real-month 2026-09"
+```
+
+Start `make mlflow` in another terminal to track the runs. The `--no-track` option writes the
+same reports and figures locally without logging runs. The CLI takes `--src`, `--models-dir`,
+`--dst`, window overrides and alert thresholds. Notebook `3.03` runs a small synthetic
+demonstration without the historical snapshot. See [monitoring verification](docs/monitoring.md)
+and [ML Canvas §10](references/ml-canvas.md#10-monitoring).
+
+### 9. Notebooks
 
 Run them in order: `0.01` → `1.01` → `1.02` → `1.03` → `1.04` → `1.05` → `2.01` → `2.02` →
-`2.03` → `2.04` → `2.05` → `3.01` → `3.02`.
+`2.03` → `2.04` → `2.05` → `3.01` → `3.02` → `3.03`.
 - `0.01`, `1.01`, `1.02`, `1.04` and `1.05` each run their pipeline step, skipping files that
   are already up to date, and validate its output.
 - `1.03` only reads `data/processed`. It first checks that data against the cleaning contract,
@@ -389,8 +409,9 @@ Run them in order: `0.01` → `1.01` → `1.02` → `1.03` → `1.04` → `1.05`
   and compares the answer with the batch forecast.
 - `3.02` needs `make mlflow` and the image running on port 8000. It refits the champions (about
   six minutes) and compares them, and the results of `docs/reproducibility/`, with the reference.
+- `3.03` compares the monitoring scenarios, alerts and proposed responses.
 
-### 9. Tests and lint
+### 10. Tests and lint
 
 One command from the project root runs the whole suite:
 

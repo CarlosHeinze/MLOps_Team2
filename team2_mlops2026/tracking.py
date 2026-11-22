@@ -160,14 +160,18 @@ def log_files_dataset(files: Iterable[Path], root, name: str, context: str) -> M
     return dataset
 
 
-def log_dataset(df: pd.DataFrame, source, name: str, context: str) -> None:
+def log_dataset(
+    df: pd.DataFrame, source, name: str, context: str, *, digest: str | None = None
+) -> None:
     """Log a small ``df`` as an input of the active MLflow run."""
     with warnings.catch_warnings():
         # Ambiguous-source and integer-column hints; the schema is only inferred at log_input
         warnings.simplefilter("ignore")
         try:
-            dataset = mlflow.data.from_pandas(df, source=dataset_source(source), name=name)
+            dataset = mlflow.data.from_pandas(
+                df, source=dataset_source(source), name=name, digest=digest
+            )
         except MlflowException:
             # MLflow cannot interpret this kind of source: log the dataset (digest, schema) without it
-            dataset = mlflow.data.from_pandas(df, name=name)
+            dataset = mlflow.data.from_pandas(df, name=name, digest=digest)
         mlflow.log_input(dataset, context=context)
