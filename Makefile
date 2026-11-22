@@ -18,6 +18,7 @@ DOCKER_PLATFORMS ?= linux/amd64,linux/arm64
 DOCKER_CONTAINER ?= mibici-ml-service
 SMOKE_IMAGE ?= $(DOCKER_IMAGE):latest
 REPRODUCE_ARGS ?= --train-runs --url http://127.0.0.1:$(SERVE_PORT)
+MONITOR_ARGS ?=
 VERSION = $(shell $(PYTHON_INTERPRETER) -c "import re; print(re.search(r'__version__ = .(.+).', open('team2_mlops2026/__init__.py').read()).group(1))")
 GIT_COMMIT = $(shell git rev-parse HEAD)
 MODEL_URIS = $(shell $(PYTHON_INTERPRETER) -c "import json; c = json.load(open('models/model_card.json')); print(','.join(m['uri'] for m in c['models'].values()))")
@@ -207,6 +208,12 @@ snapshot:
 .PHONY: reproduce
 reproduce:
 	$(PYTHON_INTERPRETER) -m team2_mlops2026.modeling.reproducibility compare $(REPRODUCE_ARGS)
+
+
+## Replay held-out months for drift, forecast error and alerts (MONITOR_ARGS)
+.PHONY: monitor
+monitor:
+	$(PYTHON_INTERPRETER) -m team2_mlops2026.monitoring $(MONITOR_ARGS)
 
 
 ## Every step after the data, in order: features, train, tune, evaluate, register, predict
