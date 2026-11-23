@@ -4,8 +4,17 @@
 
 PROJECT_NAME = team2_mlops2026
 PYTHON_VERSION = 3.12
-PYTHON_INTERPRETER ?= .venv/bin/python
-LOCK_PYTHON ?= python$(PYTHON_VERSION)
+# On Windows (GNU make run from Git Bash) a venv keeps its interpreter in Scripts/, and
+# Python 3.12 is reached through the py launcher
+ifeq ($(OS),Windows_NT)
+VENV_BIN = Scripts
+BASE_PYTHON ?= py -$(PYTHON_VERSION)
+else
+VENV_BIN = bin
+BASE_PYTHON ?= python$(PYTHON_VERSION)
+endif
+PYTHON_INTERPRETER ?= .venv/$(VENV_BIN)/python
+LOCK_PYTHON ?= $(BASE_PYTHON)
 MLFLOW_PORT ?= 5001
 SERVE_HOST ?= 127.0.0.1
 SERVE_PORT ?= 8000
@@ -80,8 +89,8 @@ test:
 ## Set up Python interpreter environment
 .PHONY: create_environment
 create_environment:
-	python$(PYTHON_VERSION) -m venv .venv
-	@echo "Activate with: source .venv/bin/activate"
+	$(BASE_PYTHON) -m venv .venv
+	@echo "Activate with: source .venv/$(VENV_BIN)/activate"
 	
 
 

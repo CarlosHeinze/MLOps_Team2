@@ -238,7 +238,8 @@ def test_clean_is_idempotent_and_reprocesses_on_new_inputs(interim_dir, tmp_path
     assert idc.clean(interim_dir, dst, workers=1)["skipped"] == 2
 
     # A newer interim month can change any user's profile -> everything is stale
-    os.utime(interim_dir / "viajes/2024/viajes_2024_02.parquet", None)
+    newer = max(p.stat().st_mtime for p in dst.rglob("*.parquet")) + 1  # "now" can tie on Windows
+    os.utime(interim_dir / "viajes/2024/viajes_2024_02.parquet", (newer, newer))
     assert len(idc.clean(interim_dir, dst, workers=1)["cleaned"]) == 2
 
     assert len(idc.clean(interim_dir, dst, force=True, workers=1)["cleaned"]) == 2
