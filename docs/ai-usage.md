@@ -1,5 +1,45 @@
 # Declaración de uso de IA
 
+## Fase 3 y declaraciones pendientes de las fases 1 y 2
+
+Declaraciones entregadas por cada integrante el 22 de noviembre de 2026 para el reporte final.
+
+### JulianMaloRomeroTEC
+
+**Referencias:**
+- OpenAI (2026). *Codex* (GPT-6 Sol, razonamiento medio, en la Fase 1; GPT-6.2 Sol,
+  razonamiento alto, en la Fase 3) [modelo de lenguaje grande]. https://openai.com/codex/
+- OpenAI (2026). *ChatGPT* [modelo de lenguaje grande]. https://chatgpt.com/
+
+**Propósito y alcance:**
+- **Fase 1** ([#21](https://github.com/CarlosHeinze/MLOps_Team2/pull/21)), Codex y ChatGPT:
+  revisar el repositorio, identificar problemas de reproducibilidad, corregir el `Makefile`,
+  las dependencias y la configuración de MLflow, y preparar documentación. Los cambios se
+  verificaron con pruebas locales antes de integrarse.
+- **Fase 2** ([#29](https://github.com/CarlosHeinze/MLOps_Team2/issues/29)), ChatGPT: revisar
+  los requisitos de la rúbrica, organizar la presentación, preparar su intervención en el video
+  y revisar la documentación del equipo.
+- **Fase 3** ([#55](https://github.com/CarlosHeinze/MLOps_Team2/pull/55),
+  [#56](https://github.com/CarlosHeinze/MLOps_Team2/pull/56)), Codex y ChatGPT: desarrollar y
+  revisar la simulación de drift (#42): monitoreo, alertas, pruebas y registro en MLflow; e
+  integrar los comandos del `Makefile`, la documentación, las dependencias y las pruebas de
+  trazabilidad (#43). Se validó con datos sintéticos e históricos y se documentaron las
+  limitaciones de reproducibilidad encontradas.
+
+En todas las fases la IA fue apoyo para programación, depuración, análisis y redacción.
+Julián revisó los resultados, mantuvo las pruebas y evidencias correspondientes y no presentó
+resultados sintéticos como datos reales.
+
+### chaverocarlos
+
+**Referencia:** Google (2026). *Gemini* (Gemini 4 Hydrogen, nivel de razonamiento bajo) [modelo
+de lenguaje grande]. https://gemini.google.com/
+
+**Propósito y alcance:** usado en las tres fases, en sus actividades: la validación de cifras
+contra MLflow y las pruebas (Fase 1), el reporte ejecutivo y el video
+([#29](https://github.com/CarlosHeinze/MLOps_Team2/issues/29), Fase 2) y la reproducción en una
+segunda máquina con WSL2 (Fase 3, `docs/reproducibility/maquina-carlos-wsl.json`).
+
 ## Fase 2
 
 Todo el código se revisó y ejecutó, y todas las cifras del reporte provienen de ejecutar ese
