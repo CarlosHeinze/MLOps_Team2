@@ -1,0 +1,115 @@
+{
+  "environment": {
+    "os": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.43",
+    "machine": "x86_64",
+    "cpu": "Intel(R) Core(TM) Ultra 9 288V",
+    "cpu_count": "8",
+    "container": "False",
+    "python": "3.12.16",
+    "numpy": "2.5.4",
+    "pandas": "3.1.0",
+    "pyarrow": "25.0.1",
+    "scikit-learn": "1.9.1",
+    "scipy": "1.18.1",
+    "lightgbm": "4.7.0",
+    "skops": "0.16.0",
+    "mlflow-skinny": "3.17.2",
+    "fastapi": "0.162.0",
+    "git_commit": "59b56cd3b9619852a5e5bde2116ddec35e2cb491"
+  },
+  "snapshot_run": "ea0f152256134089863214a3cdd2e4b4",
+  "train_runs": {
+    "train-hgb_poisson-arrivals": {
+      "model": "hgb_poisson",
+      "max_metric_rel_diff": 0.02195311961520916,
+      "rtol": 0.005,
+      "passed": false
+    },
+    "train-hgb_poisson-departures": {
+      "model": "hgb_poisson",
+      "max_metric_rel_diff": 0.02316537051236581,
+      "rtol": 0.005,
+      "passed": false
+    },
+    "train-hgb_squared_error-arrivals": {
+      "model": "hgb_squared_error",
+      "max_metric_rel_diff": 0.01974305943875097,
+      "rtol": 0.005,
+      "passed": false
+    },
+    "train-hgb_squared_error-departures": {
+      "model": "hgb_squared_error",
+      "max_metric_rel_diff": 0.024087650707358566,
+      "rtol": 0.005,
+      "passed": false
+    },
+    "train-historical_average-arrivals": {
+      "model": "historical_average",
+      "max_metric_rel_diff": 0.03671992170980242,
+      "rtol": 1e-09,
+      "passed": false
+    },
+    "train-historical_average-departures": {
+      "model": "historical_average",
+      "max_metric_rel_diff": 0.03220771490253267,
+      "rtol": 1e-09,
+      "passed": false
+    },
+    "train-lgbm_poisson-arrivals": {
+      "model": "lgbm_poisson",
+      "max_metric_rel_diff": 0.019433038790207195,
+      "rtol": 0.0001,
+      "passed": false
+    },
+    "train-lgbm_poisson-departures": {
+      "model": "lgbm_poisson",
+      "max_metric_rel_diff": 0.022324329052982376,
+      "rtol": 0.0001,
+      "passed": false
+    },
+    "train-lgbm_tweedie-arrivals": {
+      "model": "lgbm_tweedie",
+      "max_metric_rel_diff": 0.02085344508089557,
+      "rtol": 0.0001,
+      "passed": false
+    },
+    "train-lgbm_tweedie-departures": {
+      "model": "lgbm_tweedie",
+      "max_metric_rel_diff": 0.024029112733033837,
+      "rtol": 0.0001,
+      "passed": false
+    },
+    "train-poisson_glm-arrivals": {
+      "model": "poisson_glm",
+      "max_metric_rel_diff": 0.02501393913818854,
+      "rtol": 1e-06,
+      "passed": false
+    },
+    "train-poisson_glm-departures": {
+      "model": "poisson_glm",
+      "max_metric_rel_diff": 0.023522833367541032,
+      "rtol": 1e-06,
+      "passed": false
+    },
+    "train-seasonal_naive-arrivals": {
+      "model": "seasonal_naive",
+      "max_metric_rel_diff": 0.02281551646983857,
+      "rtol": 1e-09,
+      "passed": false
+    },
+    "train-seasonal_naive-departures": {
+      "model": "seasonal_naive",
+      "max_metric_rel_diff": 0.023949374501339705,
+      "rtol": 1e-09,
+      "passed": false
+    }
+  },
+  "service": {
+    "url": "http://127.0.0.1:8000",
+    "passed": true,
+    "max_diff": 0.0,
+    "rows": 3
+  },
+  "passed": false,
+  "run_id": "19a4ad2634604eb7b374164cc69d5e78"
+}
