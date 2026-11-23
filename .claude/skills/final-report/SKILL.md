@@ -24,7 +24,7 @@ as they are.
 | `reports/Entrega_Final_Equipo02.html` | The report itself. Edit this file and commit it. |
 | `reports/Entrega_Final_Equipo02.pdf` | The PDF, built from the HTML with `report.py build`. Commit it too. |
 | `reports/figures/fase1/`, `fase2/`, `fase3/` | Figures. The first two hold the delivered ones; new figures go in `fase3/`. |
-| `reports/Fase1_Equipo02.pdf`, `Fase2_Equipo02.pdf` | The delivered reports of phases 1 and 2. |
+| `reports/Fase1_Equipo02.pdf`, `Fase2_Equipo02.pdf` | The delivered reports of phases 1 and 2. `report.py pdf` appends them, unchanged, as annexes A and B after the body, so the delivered PDF integrates the earlier phases' results (Canvas, «Consideraciones adicionales»). Merging needs one of `pypdf`, `qpdf` or `pdfunite`. |
 | `assets/template.html` | Starting point: CSS, outline, ML Canvas and solution diagram, with `todo` blocks. |
 | `references/rubric.md` | Instructions, outline and rubric (Canvas, 18 Nov 2026). |
 | `references/sources.md` | Where each number and figure comes from, and which ones need MLflow or data. |
@@ -173,7 +173,8 @@ do not edit it by hand. The section ids (`resumen`, `introduccion`, `actividades
 - The GitHub activity table, filled.
 - No `todo` left (each one is listed with its line and section).
 - Every image local and present.
-- All the outline sections, by their ids.
+- All the outline sections, by their ids, and the `anexos` page before the appended reports.
+- Both annexes present, and a PDF longer than the annexes alone (so they were appended).
 - Every `xref` pointing to an existing id, and no caption numbered by hand.
 
 Two things it cannot check, so check them by eye:

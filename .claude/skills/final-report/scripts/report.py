@@ -9,7 +9,8 @@
 
 Only the standard library, so it runs with the project's .venv or any Python 3.10+ on Windows,
 macOS or Linux. `activity` needs git and an authenticated gh; `pdf` needs Chrome, Edge or
-Chromium (CHROME_PATH or --browser to point at one).
+Chromium (CHROME_PATH or --browser to point at one), and one of pypdf, qpdf or pdfunite to
+append the delivered Phase 1 and 2 reports as annexes A and B.
 """
 
 from __future__ import annotations
@@ -32,6 +33,10 @@ REPO = SKILL_DIR.parents[2]
 TEMPLATE = SKILL_DIR / "assets" / "template.html"
 REPORT = REPO / "reports" / "Entrega_Final_Equipo02.html"
 PDF = REPORT.with_suffix(".pdf")
+# The delivered reports of phases 1 and 2, appended as they are (annexes A and B) after the
+# body, so the PDF integrates the results of the earlier phases (Canvas, «Consideraciones
+# adicionales»). The body condenses them; the annexes keep their own page numbers.
+ANNEXES = (REPO / "reports" / "Fase1_Equipo02.pdf", REPO / "reports" / "Fase2_Equipo02.pdf")
 
 GITHUB_URL = "https://github.com/CarlosHeinze/MLOps_Team2"
 DOCKERHUB_URL = "https://hub.docker.com/r/racj90120hplmnv09/mibici-ml-service"
@@ -62,6 +67,7 @@ SECTIONS = {
     "conclusiones": "conclusiones: lecciones, mejoras, trabajo futuro",
     "ia": "declaración de uso de IA",
     "referencias": "referencias",
+    "anexos": "anexos: los reportes entregados de las fases 1 y 2",
 }
 BROWSERS = {
     "win32": [
@@ -329,6 +335,15 @@ def problems(html: str) -> list[str]:
 
 def cmd_check(args: argparse.Namespace) -> int:
     found = problems(read_report())
+    annex_pages = sum(pages(a) for a in ANNEXES if a.exists())
+    for annex in ANNEXES:
+        if not annex.exists():
+            found.append(f"annex not found: {annex.relative_to(REPO)}")
+    if PDF.exists() and pages(PDF) <= annex_pages:
+        found.append(
+            f"{PDF.name} lacks the annexes ({pages(PDF)} pages, the annexes alone have "
+            f"{annex_pages}): run `report.py pdf` on a machine with pypdf, qpdf or pdfunite"
+        )
     if getattr(args, "only", None):
         found = [p for p in found if args.only.lower() in p.lower()]
     pdf_note = (
@@ -361,10 +376,39 @@ def pages(pdf: Path) -> int:
     return len(re.findall(rb"/Type\s*/Page[^s]", pdf.read_bytes()))
 
 
+def merge_pdfs(parts: list[Path], out: Path) -> str:
+    """Concatenate PDFs with the first tool available; returns its name."""
+    try:
+        from pypdf import PdfWriter  # optional dependency
+    except ImportError:
+        PdfWriter = None
+    if PdfWriter is not None:
+        writer = PdfWriter()
+        for part in parts:
+            writer.append(str(part))
+        with out.open("wb") as f:
+            writer.write(f)
+        return "pypdf"
+    if shutil.which("qpdf"):
+        run("qpdf", "--empty", "--pages", *map(str, parts), "--", str(out))
+        return "qpdf"
+    if shutil.which("pdfunite"):
+        run("pdfunite", *map(str, parts), str(out))
+        return "pdfunite"
+    sys.exit(
+        "Cannot append the annexes: install one of `pip install pypdf`, qpdf "
+        "(`brew install qpdf`, `choco install qpdf`) or poppler's pdfunite"
+    )
+
+
 def cmd_pdf(args: argparse.Namespace) -> None:
     read_report()
+    for annex in ANNEXES:
+        if not annex.exists():
+            sys.exit(f"annex not found: {annex.relative_to(REPO)}")
     browser = find_browser(args.browser)
-    with tempfile.TemporaryDirectory() as profile:
+    with tempfile.TemporaryDirectory() as tmp:
+        body = Path(tmp) / "body.pdf"
         result = subprocess.run(
             [
                 browser,
@@ -372,10 +416,10 @@ def cmd_pdf(args: argparse.Namespace) -> None:
                 "--disable-gpu",
                 "--no-first-run",
                 "--no-default-browser-check",
-                f"--user-data-dir={profile}",
+                f"--user-data-dir={Path(tmp) / 'profile'}",
                 "--no-pdf-header-footer",
                 "--run-all-compositor-stages-before-draw",
-                f"--print-to-pdf={PDF}",
+                f"--print-to-pdf={body}",
                 REPORT.as_uri(),
             ],
             capture_output=True,
@@ -383,10 +427,16 @@ def cmd_pdf(args: argparse.Namespace) -> None:
             check=False,
             timeout=180,
         )
-    if result.returncode != 0 or not PDF.exists():
-        sys.exit(f"{Path(browser).name} could not print the PDF:\n{result.stderr.strip()[-2000:]}")
+        if result.returncode != 0 or not body.exists():
+            sys.exit(
+                f"{Path(browser).name} could not print the PDF:\n{result.stderr.strip()[-2000:]}"
+            )
+        tool = merge_pdfs([body, *ANNEXES], PDF)
+        body_pages = pages(body)
+    annex_pages = ", ".join(f"{a.stem} {pages(a)}" for a in ANNEXES)
     print(
-        f"{PDF.relative_to(REPO)}: {pages(PDF)} pages, {PDF.stat().st_size / 1e6:.1f} MB ({Path(browser).name})"
+        f"{PDF.relative_to(REPO)}: {pages(PDF)} pages ({body_pages} of the report + annexes "
+        f"{annex_pages}), {PDF.stat().st_size / 1e6:.1f} MB ({Path(browser).name}, {tool})"
     )
 
 
