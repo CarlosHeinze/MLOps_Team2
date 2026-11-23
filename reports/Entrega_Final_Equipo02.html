@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Entrega final · Equipo 02 · MiBici</title>
+<style>
+  /* Letter, the margins and the footer of the Phase 1 and 2 reports. The footer is CSS so the PDF
+     prints with Chrome or Edge headless alone (report.py pdf). */
+  @page {
+    size: Letter; margin: 15mm 16mm 17mm 16mm;
+    @bottom-left { content: "Entrega final · Equipo 02 · MiBici · TC5044.10"; font: 7pt Arial, sans-serif; color: #5b6875; }
+    @bottom-right { content: counter(page) " / " counter(pages); font: 7pt Arial, sans-serif; color: #5b6875; }
+  }
+  :root {
+    --ink: #1b2733; --muted: #5b6875; --accent: #0e6f68; --accent-soft: #e7f2f0;
+    --rule: #d5dfdd; --head: #15324d; --warn: #8a5a00; --warn-soft: #fbf3e2;
+  }
+  * { box-sizing: border-box; }
+  html, body { background: #fff; }
+  /* Avenir Next is macOS only; Windows falls back to Segoe UI, so page breaks differ by machine */
+  body { margin: 0; color: var(--ink); font: 9.4pt/1.45 "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+  a { color: var(--accent); text-decoration: none; }
+  p { margin: 0 0 6pt; }
+  ul { margin: 0 0 6pt; padding-left: 14pt; }
+  li { margin-bottom: 2pt; }
+  b, strong { font-weight: 600; color: var(--head); }
+  code { font: 8.3pt Menlo, Consolas, monospace; background: #f1f4f4; padding: 0 2pt; border-radius: 2pt; }
+
+  .kicker { font-size: 8pt; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+  h1 { font-size: 21pt; line-height: 1.15; color: var(--head); margin: 4pt 0 4pt; font-weight: 700; }
+  .subtitle { font-size: 11pt; color: var(--muted); margin-bottom: 8pt; }
+  .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 2pt 18pt; font-size: 8.6pt; color: var(--muted);
+          border-top: 2pt solid var(--accent); border-bottom: 1px solid var(--rule); padding: 6pt 0; margin-bottom: 10pt; }
+  .meta b { color: var(--ink); font-weight: 600; }
+  .team { display: grid; grid-template-columns: max-content max-content; gap: 0 14pt; margin-top: 1pt; color: var(--ink); }
+  .team span:nth-child(even) { font-variant-numeric: tabular-nums; color: var(--muted); }
+
+  h2 { font-size: 13pt; color: var(--head); margin: 14pt 0 6pt; padding-bottom: 3pt; border-bottom: 1px solid var(--rule);
+       break-after: avoid; }
+  h2 .n { color: var(--accent); margin-right: 4pt; }
+  h3 { font-size: 10pt; color: var(--head); margin: 9pt 0 3pt; break-after: avoid; }
+  .page-break { break-before: page; }
+
+  .summary { background: var(--accent-soft); border-left: 3pt solid var(--accent); padding: 8pt 10pt; margin: 0 0 8pt; }
+  .summary p:last-child { margin: 0; }
+  .keyfigs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6pt; margin: 6pt 0 2pt; }
+  .keyfigs div { background: #fff; border: 1px solid var(--rule); border-radius: 3pt; padding: 5pt 7pt; font-size: 8.3pt; color: var(--muted); }
+  .keyfigs b { display: block; font-size: 12.5pt; color: var(--head); }
+  .criterion { border: 1px solid var(--accent); border-radius: 3pt; padding: 5pt 8pt; margin: 4pt 0 8pt; background: #fbfdfc; }
+  .tag { display: inline-block; font-size: 6.8pt; font-weight: 700; letter-spacing: .06em; padding: 0 4pt; border-radius: 2pt;
+         border: 1px solid var(--accent); color: var(--accent); vertical-align: 1pt; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 8.4pt; margin: 4pt 0 8pt; break-inside: avoid; }
+  table.flowing { break-inside: auto; }
+  tr { break-inside: avoid; }
+  th { text-align: left; background: #e9f0ef; color: var(--head); font-weight: 600; padding: 4pt 5pt; border-bottom: 1px solid #b9c9c6; }
+  td { padding: 3.5pt 5pt; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tr.pick td { background: #f1f8f6; font-weight: 600; }
+  tr.base td { color: var(--muted); }
+  table.activity { font-size: 7.9pt; margin-bottom: 5pt; }
+  table.activity th:first-child { color: var(--accent); }
+  table.activity .note { font-size: 7pt; }
+  .mono { font: 7.3pt Menlo, Consolas, monospace; }
+  .mono.run { font-size: 7pt; white-space: nowrap; }
+
+  figure { margin: 6pt 0 9pt; break-inside: avoid; }
+  figure img { width: 100%; display: block; border: 1px solid var(--rule); }
+  figcaption { font-size: 7.9pt; color: var(--muted); margin-top: 3pt; }
+  figcaption > b.num-label, .figcap > b.num-label, .tabcap > b.num-label { color: var(--muted); font-weight: 600; }
+  figure.w80 img, figure.w80 figcaption { width: 82%; margin-left: auto; margin-right: auto; }
+  figure.w65 img, figure.w65 figcaption { width: 65%; margin-left: auto; margin-right: auto; }
+  figure.w60 img, figure.w60 figcaption { width: 60%; margin-left: auto; margin-right: auto; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10pt; align-items: start; }
+
+  /* ML Canvas (Phase 1) */
+  .canvas { display: grid; grid-template-columns: repeat(5, 1fr); grid-auto-rows: auto; gap: 4pt; font-size: 7.5pt; line-height: 1.33;
+            margin: 6pt 0 4pt; break-inside: avoid; }
+  .canvas div { border: 1px solid #b9c9c6; border-radius: 3pt; padding: 4pt 5pt; background: #fbfdfc; }
+  .canvas h4 { margin: 0 0 2pt; font-size: 7.4pt; letter-spacing: .05em; text-transform: uppercase; color: var(--accent); }
+  .canvas .vp { grid-row: span 2; background: var(--accent-soft); }
+  .canvas .mon { grid-column: span 5; }
+
+  /* flow diagrams (Phases 1 and 2) */
+  .flow { display: flex; align-items: stretch; gap: 0; margin: 6pt 0 8pt; break-inside: avoid; }
+  .flow .st { flex: 1; border: 1px solid #b9c9c6; border-radius: 3pt; padding: 4pt 5pt; font-size: 7.6pt; line-height: 1.3; background: #fbfdfc; }
+  .flow .st b { display: block; font-size: 8pt; }
+  .flow .st .d { font: 7pt Menlo, Consolas, monospace; color: var(--accent); }
+  .flow .ar { align-self: center; color: var(--accent); font-size: 11pt; padding: 0 2pt; }
+
+  /* solution diagram: stages by phase, the tools of each, and what runs across all of them */
+  .arch { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4pt 9pt; margin: 6pt 0 4pt; font-size: 7.4pt; line-height: 1.3; break-inside: avoid; }
+  .arch .lane { grid-column: span 2; text-align: center; font-size: 7.4pt; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+                color: #fff; background: var(--accent); border-radius: 3pt; padding: 2pt; }
+  .arch .box { border: 1px solid #b9c9c6; border-radius: 3pt; padding: 4pt 5pt; background: #fbfdfc; position: relative; }
+  .arch .box b { display: block; font-size: 8pt; }
+  .arch .box .t { display: block; margin-top: 2pt; font: 6.8pt Menlo, Consolas, monospace; color: var(--accent); }
+  .arch .box:not(.last)::after { content: "→"; position: absolute; right: -9pt; top: 40%; width: 9pt; text-align: center; color: var(--accent); font-size: 9pt; }
+  .arch .bar { border: 1px dashed var(--accent); border-radius: 3pt; padding: 3pt 6pt; background: var(--accent-soft); }
+  .arch .bar b { color: var(--accent); }
+  .arch .user { border: 1.5px solid var(--head); border-radius: 3pt; padding: 3pt 6pt; background: #fff; }
+  .span2 { grid-column: span 2; } .span3 { grid-column: span 3; } .span4 { grid-column: span 4; } .span6 { grid-column: span 6; }
+
+  .note { font-size: 8pt; color: var(--muted); }
+  .refs { font-size: 8pt; color: var(--muted); }
+  .refs p { margin-bottom: 3pt; padding-left: 12pt; text-indent: -12pt; }
+
+  /* Pending content. report.py check lists every one; none can be left in the delivered PDF. */
+  .todo { background: #fff4d6; border-left: 3pt solid #d08a00; padding: 4pt 7pt; margin: 4pt 0 8pt; color: #7a4b00; font-size: 8.4pt; }
+  span.todo { display: inline; padding: 0 3pt; margin: 0; border-left: 0; }
+</style>
+</head>
+<body>
+
+<div class="kicker">Tecnológico de Monterrey · Maestría en Inteligencia Artificial Aplicada · TC5044.10 Operaciones de Aprendizaje Automático</div>
+<h1>MiBici: del dato abierto a un servicio de pronóstico reproducible y monitoreado</h1>
+<div class="subtitle">Entrega final · Integración de las fases 1 a 3 · Equipo 02</div>
+<div class="meta">
+  <div>
+    <b>Integrantes</b>
+    <div class="team">
+      <span>Javier Ramírez</span><span>A01797453</span>
+      <span>Carlos Antonio Heinze Mortera</span><span>A01700179</span>
+      <span>Julián Malo Romero</span><span>A01797459</span>
+      <span>Carlos Arturo Chavero Cruz</span><span>A01797583</span>
+    </div>
+  </div>
+  <div>
+    <div><b>Fecha:</b> 22 de noviembre de 2026</div>
+    <div><b>Repositorio:</b> <a href="https://github.com/CarlosHeinze/MLOps_Team2">github.com/CarlosHeinze/MLOps_Team2</a></div>
+    <div><b>Imagen Docker:</b> <a href="https://hub.docker.com/r/racj90120hplmnv09/mibici-ml-service">hub.docker.com/r/racj90120hplmnv09/mibici-ml-service</a>, tag <code>0.1.1</code> (= <code>latest</code>)</div>
+    <div><b>Datos:</b> <a href="https://mibici.net/es/datos-abiertos/">mibici.net/es/datos-abiertos</a>, dic 2014 – sep 2026</div>
+  </div>
+</div>
+
+<div class="summary" id="resumen">
+  <p><b>Resumen ejecutivo.</b> MiBici, la bicicleta pública de Guadalajara, pierde viajes cuando una estación se queda sin bicicletas o sin anclajes, y su equipo de redistribución necesita saber la noche anterior qué estaciones se vaciarán o llenarán. En la <b>Fase 1</b> convertimos 12 años de datos abiertos en una tabla estación‑hora trazable: cinco etapas versionadas en MLflow y encadenadas por digest. En la <b>Fase 2</b> entrenamos 2 baselines y 5 candidatos, ajustamos los finalistas y los evaluamos con un backtest de 12 meses. <b>El campeón, LightGBM con pérdida Tweedie, reduce el WAPE en hora pico 15.4 % (salidas) y 15.1 % (llegadas) frente al mejor baseline</b>, y cumple el criterio de éxito que fijamos en el ML Canvas antes de entrenar. En la <b>Fase 3</b> lo llevamos a operación. Lo servimos con FastAPI en una imagen Docker publicada, que da los mismos pronósticos que el batch con diferencia 0. Comprobamos que se reproduce en un contenedor limpio y en otras máquinas, cubrimos el pipeline con 307 pruebas automáticas y montamos un monitoreo de drift con umbrales, alertas y una acción para cada caso. Al replicar septiembre de 2026, ese monitoreo detectó las ~100 estaciones nuevas de la red.</p>
+  <div class="keyfigs">
+    <div><b>37.8 M</b>viajes limpios de 142 archivos mensuales, con linaje por digest (Fase 1)</div>
+    <div><b>−15.4 % / −15.1 %</b>WAPE en hora pico del campeón frente al mejor baseline (salidas / llegadas, Fase 2)</div>
+    <div><b>307 pruebas</b>unitarias y de integración con <code>pytest -q</code>, en 3 min 24 s (Windows)</div>
+    <div><b>0 de diferencia</b>entre los 11,208 pronósticos de <code>POST /predict</code> y los del batch; imagen amd64 y arm64</div>
+    <div><b>≤ 1.5 × 10<sup>−13</sup></b>diferencia relativa de métricas al reentrenar el campeón en un contenedor limpio</div>
+    <div><b>20.8 %</b>de filas con estaciones nunca vistas en sep 2026: alerta de calidad y revisión del pipeline</div>
+  </div>
+  <p class="note" style="margin-top:5pt">Cada cifra proviene de un run de MLflow, de un notebook ejecutado, de un documento de verificación del repositorio o de un comando, y el texto dice de cuál. Las de las fases 1 y 2 son las de los reportes entregados, que se incluyen completos como anexos A y B al final de este PDF.</p>
+</div>
+
+<h2 id="introduccion"><span class="n">1</span>Introducción</h2>
+
+<h3>1.1 La problemática y el ML Canvas</h3>
+<p><b>El problema.</b> Cada viaje sale de una estación y termina en otra, así que las bicicletas se acumulan donde la gente llega y se agotan donde sale. En la Fase 1 los datos mostraron que el desbalance es grande, estructural y predecible:</p>
+<ul>
+  <li><b>Flujos unidireccionales:</b> en todo el historial, el grupo Av. Vallarta / Los Arcos envió ~320 mil viajes más de los que recibió, y López Cotilla / Penitenciaría recibió ~241 mil más de los que envió.</li>
+  <li><b>Una estación se vacía o se llena en un día:</b> la estación mediana tiene 15 anclajes y, desde 2025, el flujo neto diario supera 12 bicicletas en el 10 % de los días‑estación y 32 en el 1 %.</li>
+  <li><b>La demanda es concentrada y predecible:</b> hay picos laborales a las 8:00 y a las 18:00 y un solo pico al mediodía en fin de semana, y el 10 % de las 486 estaciones origina el 39.5 % de los viajes.</li>
+  <li><b>La red cambia:</b> abrieron ~100 estaciones entre mayo y agosto de 2026, y septiembre de 2026 es el mes con más viajes de la historia.</li>
+</ul>
+<p><b>Por qué ML y no una regla.</b> Un promedio histórico por estación capta la semana típica, pero no la tendencia, el quiebre por COVID ni las interacciones estación × hora × día. Tampoco puede pronosticar las estaciones nuevas, que no tienen historia. Por eso planteamos un modelo global de conteo y dejamos las reglas simples como los <b>baselines que debe superar</b>. El criterio de éxito se fijó antes de entrenar: WAPE en horas pico al menos 10 % menor que el del mejor baseline, sin ningún grupo de estaciones peor que ese baseline.</p>
+<table>
+  <tr><th style="width:38%">Característica del problema</th><th>Cómo guió la solución</th><th style="width:12%">Sección</th></tr>
+  <tr><td>Conteos por hora, dispersos (54.6 % de ceros) y sesgados</td><td>Pérdida Poisson/Tweedie; WAPE y devianza como métricas, no el error cuadrático</td><td>3.2, 3.3</td></tr>
+  <tr><td>Serie de tiempo con tendencia y un quiebre por COVID</td><td>Partición temporal, validación temporal en el ajuste y backtest de origen móvil</td><td>3.3</td></tr>
+  <tr><td>La decisión se toma la noche anterior</td><td>Solo variables conocidas con 48 h de anticipación; batch nocturno y API en línea</td><td>3.2, 3.5</td></tr>
+  <tr><td>~480 estaciones que comparten patrones, y estaciones que abren cada mes</td><td>Un modelo global por objetivo con perfiles de uso PCA; monitoreo de estaciones no vistas</td><td>3.3, 3.8</td></tr>
+  <tr><td>Datos que se publican cada mes y una red que cambia</td><td>Contrato de datos, linaje por digest, reentrenamiento reproducible y monitoreo de drift</td><td>3.1, 3.7, 3.8</td></tr>
+</table>
+<p class="note tabcap" id="tab-caracteristicas">Características del problema, observadas en los datos de la Fase 1, y la decisión que tomamos con cada una.</p>
+<div class="canvas">
+  <div><h4>Tarea de predicción</h4>Pronóstico multiserie de conteos. Entidad: estación‑hora (~480 estaciones activas). Salidas y llegadas en cada una de las próximas 24 h; flujo neto = llegadas − salidas.</div>
+  <div><h4>Decisiones</h4>Cada noche y a las ~13:00: bicicletas proyectadas = actuales + flujo neto acumulado. Se marcan estaciones bajo un mínimo o sobre capacidad − margen, se priorizan por viajes no atendidos y se planean rutas de camiones.</div>
+  <div class="vp"><h4>Propuesta de valor</h4>Beneficiario: equipo de redistribución de MiBici; indirectamente, los usuarios.<br><br>Dolor: flujos unidireccionales que vacían o llenan estaciones en horas.<br><br>Integración: lista o tablero nocturno de estaciones a surtir o vaciar, con hora y cantidad esperadas, y una API para consultarlo en línea.</div>
+  <div><h4>Recolección de datos</h4>142 CSV mensuales descargados de forma idempotente con manifiesto SHA‑256. Cada mes nuevo se normaliza, valida y limpia; cada versión queda en MLflow. Las etiquetas llegan solas: los viajes del mes siguiente.</div>
+  <div><h4>Fuentes de datos</h4>Datos abiertos MiBici: viajes y nomenclatura actual (484 estaciones, capacidad). Candidatas: clima, festivos, calendario escolar. Faltan: inventario en vivo e historial de estaciones.</div>
+  <div><h4>Simulación de impacto</h4>Backtest con origen móvil en los últimos 12 meses contra naive estacional y promedio histórico: MAE, WAPE, devianza de Poisson. Criterio: WAPE ≥ 10 % menor en horas pico, sin grupo de estaciones peor que el baseline.</div>
+  <div><h4>Hacer predicciones</h4>Batch nocturno (~23:00) de las próximas 24 h: ~480 × 24 ≈ 11.5 mil pronósticos en segundos. En línea, <code>POST /predict</code> (FastAPI) en la imagen Docker <code>0.1.1</code>, con los mismos modelos y las mismas cifras que el batch.</div>
+  <div><h4>Construcción de modelos</h4>Un modelo global por objetivo: baselines y luego gradient boosting con pérdida Poisson/Tweedie; partición temporal; cada corrida en MLflow. Reproducible: lock de 186 paquetes, <code>SEED = 42</code> y run snapshot; tolerancia 10<sup>−4</sup> en LightGBM por el número de hilos.</div>
+  <div><h4>Variables</h4>Estación: target encoding, ubicación, capacidad, perfiles PCA. Tiempo: hora y mes en seno/coseno, día de la semana one‑hot. Historial: demanda 2 y 7 días antes y media de 4 semanas. Sin género ni edad.</div>
+  <div class="mon"><h4>Monitoreo</h4>Datos: contrato en cada mes nuevo; PSI de variables y pronósticos (aviso ≥ 0.10, alerta ≥ 0.25); faltantes +10 pp o ≥ 10 % de filas con estaciones no vistas → revisar el pipeline y el contrato. Modelo: WAPE en hora pico sobre la media + 2σ del backtest (0.604 / 0.561) o mejora &lt; 10 % frente al mejor baseline → pérdida de desempeño; con drift y pérdida confirmada, reentrenar y mover <code>champion</code> solo si el candidato pasa el backtest. Negocio: estación‑horas sin bicicletas o sin anclajes y km de camión por bicicleta redistribuida.</div>
+</div>
+<p class="note figcap" id="fig-canvas">Machine Learning Canvas v1.2 (Dorard, 2015) del proyecto, condensado y actualizado con la Fase 3 (§5 predicciones, §8 reproducibilidad, §10 monitoreo). El completo está en <code>references/ml-canvas.md</code>.</p>
+
+<h3>1.2 Por qué MLOps</h3>
+<p>Este modelo no se entrena una vez y se olvida. Cada mes llegan datos nuevos con los que hay que reentrenarlo, debe servirse cada noche y su desempeño cambia con la red: ~100 estaciones nuevas en 2026 y un récord de demanda en septiembre. En un sistema así, el código del modelo es una parte pequeña. El riesgo está en los datos, la configuración, el entorno y el servicio que lo rodean, la «deuda técnica oculta» de Sculley et al. (2015). Por eso adoptamos MLOps: automatizar y versionar cada paso del ciclo de vida para que el modelo se pueda reconstruir, auditar y operar (Kreuzberger et al., 2023). Cada práctica cubre un riesgo concreto del caso:</p>
+<table class="flowing">
+  <tr><th style="width:27%">Riesgo en este proyecto</th><th style="width:33%">Práctica MLOps</th><th>Dónde quedó</th></tr>
+  <tr><td>El origen cambió de formato en 12 años; un mes mal leído contamina todo</td><td>Contrato de datos y versionado por digest de cada etapa</td><td>Fase 1: 5 runs de MLflow encadenados por digest</td></tr>
+  <tr><td>Elegir el modelo con la métrica que más conviene después</td><td>Criterio de éxito fijado antes; tracking de cada experimento</td><td>Fase 2: 195 runs, backtest de 12 meses</td></tr>
+  <tr><td>No saber qué modelo está en producción ni con qué datos se entrenó</td><td>Model Registry con alias, descripción, digests y commit</td><td>Fase 2: <code>mibici-&lt;objetivo&gt;@champion</code></td></tr>
+  <tr><td>Un cambio rompe el pipeline sin que nadie lo note</td><td>Pruebas unitarias y de integración con un solo comando</td><td>Fase 3: 307 pruebas, <code>pytest -q</code></td></tr>
+  <tr><td>«Funciona en mi máquina»</td><td>Contenedor, dependencias fijadas y reproducción en entorno limpio</td><td>Fase 3: imagen <code>0.1.1</code>, lock, snapshot</td></tr>
+  <tr><td>La red cambia y el modelo se degrada en silencio</td><td>Monitoreo de drift con umbrales, alertas y acción</td><td>Fase 3: <code>make monitor</code>, runs <code>drift-*</code></td></tr>
+</table>
+<p class="note tabcap" id="tab-mlops">Riesgos del caso y la práctica de MLOps que los cubre, por fase.</p>
+
+<h3>1.3 Diagrama de la solución</h3>
+<div class="arch">
+  <div class="lane">Fase 1 · Datos</div><div class="lane">Fase 2 · Modelos</div><div class="lane">Fase 3 · Despliegue y monitoreo</div>
+  <div class="box"><b>Adquisición y normalización</b>142 CSV mensuales → Parquet con esquema único y manifiesto SHA‑256<span class="t">requests · pandas · pyarrow</span></div>
+  <div class="box"><b>Limpieza, EDA y variables</b>contrato de datos, tabla estación‑hora, perfiles PCA<span class="t">pandas · scikit‑learn</span></div>
+  <div class="box"><b>Entrenamiento y ajuste</b>2 baselines, 5 candidatos, búsqueda aleatoria con validación temporal<span class="t">scikit‑learn · LightGBM</span></div>
+  <div class="box"><b>Evaluación y registro</b>backtest de 12 meses; alias <code>champion</code> en el Registry<span class="t">MLflow Model Registry</span></div>
+  <div class="box"><b>Export y serving</b>campeones en <code>models/</code> con <code>model_card.json</code>; <code>POST /predict</code> validado, en una imagen publicada<span class="t">FastAPI · Pydantic · Docker</span></div>
+  <div class="box last"><b>Monitoreo de drift</b>PSI y KS, escenarios sintéticos y réplica real, umbrales → alerta → acción<span class="t">monitoring.py · runs drift-*</span></div>
+  <div class="bar span6"><b>MLflow Tracking</b> · un run por etapa con sus datasets y digests, parámetros, métricas y artefactos; run <code>snapshot-373aa06d7db0</code> con las tablas y las salidas de referencia del campeón</div>
+  <div class="bar span6"><b>Ingeniería</b> · Cookiecutter Data Science · paquete <code>team2_mlops2026</code> con CLIs (typer) · <code>Makefile</code> · 307 pruebas con <code>pytest</code> y ruff · <code>requirements-lock.txt</code> · GitHub: issue → rama → PR revisado</div>
+  <div class="user span3"><b>Pronóstico batch nocturno</b> (<code>make predict</code>): 24 h por estación desde <code>models:/mibici-&lt;objetivo&gt;@champion</code></div>
+  <div class="user span3"><b>Equipo de redistribución</b>: lista de estaciones a surtir o vaciar; consultas en línea a la API (<code>docker run -p 8000:8000</code>)</div>
+</div>
+<p class="note figcap" id="fig-solucion">Componentes y herramientas de la solución por fase, en el orden de los 16 pasos del pipeline del README. Cada caja es un módulo con su CLI y su notebook; las barras corren a lo largo de todas las etapas.</p>
+
+<h2 id="actividades"><span class="n">2</span>Actividades realizadas en cada fase</h2>
+<p>Cada fase partió del artefacto que dejó la anterior: la Fase 2 entrenó sobre el digest de la tabla de la Fase 1, y la Fase 3 sirvió, reprodujo y monitoreó exactamente las versiones que la Fase 2 registró. Todo el trabajo siguió el mismo flujo: issue con alcance y criterios de aceptación → rama → pull request revisado → <code>master</code>.</p>
+<table class="flowing">
+  <tr><th style="width:10%">Fase</th><th style="width:11%">Fechas (2026)</th><th>Actividades</th><th style="width:14%">Issues</th><th style="width:14%">Pull requests</th></tr>
+  <tr><td>1 · Datos</td><td>21 – 25 oct</td><td>ML Canvas; extracción, normalización y limpieza con contrato de datos; EDA; tabla estación‑hora y preprocesador; perfiles PCA; versionado de las cinco etapas en MLflow; estructura Cookiecutter y refactorización.</td><td>#1 – #16</td><td>#2, #4, #6, #17 – #21</td></tr>
+  <tr><td>2 · Modelos</td><td>26 oct – 8 nov</td><td>Métricas y criterio de éxito; baselines y cinco candidatos; ajuste de hiperparámetros; backtest de 12 meses y ablación de PCA; Model Registry con alias; pronóstico batch; <code>make pipeline</code>.</td><td>#22 – #29</td><td>#30 – #37</td></tr>
+  <tr><td>3 · Despliegue</td><td>9 – 22 nov</td><td>Pruebas unitarias y de integración (#38); servicio FastAPI y export de los campeones (#39); imagen Docker en Docker Hub (#40); reproducibilidad en entorno limpio y en otras máquinas (#41); drift y pérdida de desempeño (#42); integración en el <code>Makefile</code> y el README (#43); este reporte (#44). Los cinco <i>nice‑to‑have</i> (#45 – #49) quedaron como trabajo futuro.</td><td>#38 – #44 (obligatorios), #45 – #49</td><td>#50 – #57</td></tr>
+</table>
+<p class="note tabcap" id="tab-fases">Actividades, issues y pull requests de cada fase. El detalle de los métodos está en la sección 3 y el de los roles en la sección 4.</p>
+
+<h2 id="metodos"><span class="n">3</span>Métodos y resultados por etapa</h2>
+<p>Cada subsección sigue el mismo orden: el método, por qué lo elegimos frente a las alternativas, el resultado con su fuente y la decisión que tomamos. Las fases 1 y 2 se condensan de sus reportes con las mismas cifras, y los reportes completos van como anexos A y B (<a class="xref" href="#tab-anexos"></a>); la Fase 3 va con más detalle.</p>
+
+<h3>3.1 Datos: adquisición, limpieza y versionado (Fase 1, anexo A)</h3>
+<div class="flow">
+  <div class="st"><b>Extracción</b>143 CSV (3.1 GB) + manifiesto SHA‑256<div class="d">mibici_raw 25643d10</div></div><div class="ar">→</div>
+  <div class="st"><b>Normalización</b>Parquet mensual, esquema único<div class="d">interim 4d7eba9d</div></div><div class="ar">→</div>
+  <div class="st"><b>Limpieza</b>contrato de datos e imputación<div class="d">processed 3cef612f</div></div><div class="ar">→</div>
+  <div class="st"><b>Variables</b>tabla estación‑hora<div class="d">features 47db7793</div></div><div class="ar">→</div>
+  <div class="st"><b>Perfiles PCA</b>371 estaciones × 26<div class="d">profiles c174ef70</div></div>
+</div>
+<p class="note figcap" id="fig-etapas">Las cinco etapas de datos de la Fase 1 con el digest de su salida en MLflow. El digest de salida de cada etapa es el de entrada de la siguiente.</p>
+<p><b>Adquisición y normalización.</b> El origen, los datos abiertos de MiBici (MiBici, 2026), cambió de formato a lo largo de 12 años: 100 archivos en UTF‑8 y 43 en Latin‑1, tres formatos de fecha y nombres de columna distintos. En lugar de corregir a mano, <code>raw_data_normalization</code> detecta cada variante y escribe un Parquet por mes con un esquema único. Son 39,078,984 viajes, y un archivo que no coincide con el esquema detiene la etapa (<code>SchemaError</code>). La descarga es idempotente y guarda un manifiesto con el SHA‑256 de cada archivo.</p>
+<p><b>Limpieza con contrato de datos.</b> Cada regla se justificó con pruebas sobre los datos (notebook 1.02) y cada mes deja un <code>cleaning_report.json</code> con las filas que tocó cada regla:</p>
+<table>
+  <tr><th>Regla</th><th>Criterio</th><th>Acción</th><th class="num">Afectados</th></tr>
+  <tr><td>Duplicados</td><td>Filas idénticas; después, <code>Viaje_Id</code> debe ser único</td><td>Eliminar</td><td class="num">758</td></tr>
+  <tr><td>Viajes inválidos</td><td>Duración &lt; 60 s o &gt; 24 h; velocidad &gt; 30 km/h</td><td>Eliminar</td><td class="num">1,291,340</td></tr>
+  <tr><td>Demografía inválida</td><td>Género fuera de {M, F}; edad fuera de 16–90 años</td><td>Valor a nulo (el viaje se conserva)</td><td class="num">8,245</td></tr>
+  <tr><td>Faltantes recuperables</td><td>Género o año de nacimiento conocidos en otros viajes del usuario</td><td>Imputar del perfil del usuario</td><td class="num">37,264</td></tr>
+</table>
+<p class="note tabcap" id="tab-limpieza">Contrato de limpieza (run <code>clean-interim-trips</code>): 37,786,886 viajes conservados, −3.3 %.</p>
+<p><b>Experimento con versiones del dataset.</b> Antes de fijar la regla de faltantes comparamos tres versiones del dataset (métricas <code>strategy_*</code> del mismo run). Eliminar filas (A) quita hasta el 6.12 % de los viajes de una estación, y la demanda por estación es justamente el objetivo. El relleno global (B) imputa 224,871 valores y mueve más la distribución de género y edad. <b>Elegimos C, imputar del perfil del propio usuario:</b> conserva el 100 % de los viajes, imputa 37,264 valores (6 veces menos que B) y deja el resto como faltante explícito.</p>
+<p><b>Versionado.</b> Los ~5 GB de datos no van en Git; se versionan por contenido. Cada etapa es un run de MLflow (MLflow Project, 2026) que registra sus parámetros, sus métricas y sus datasets de entrada y salida con un digest calculado sobre los bytes de los archivos. <code>tests/test_lineage.py</code> comprueba que el digest de salida de cada etapa sea el de entrada de la siguiente. Reprodujimos la cadena completa en dos equipos (Windows y macOS) con totales idénticos. Preferimos MLflow a DVC porque ya era el registro de experimentos y de modelos: un solo sistema guarda datos, corridas y versiones.</p>
+
+<h3>3.2 Exploración, variables y PCA (Fase 1, anexo A)</h3>
+<p>El EDA (notebook 1.03) se usó para tomar decisiones de modelado, no solo para describir los datos:</p>
+<table>
+  <tr><th style="width:46%">Hallazgo del EDA</th><th>Decisión que tomamos</th></tr>
+  <tr><td>La demanda depende de la hora y del día de forma no lineal; el pico matutino solo existe entre semana.</td><td>Hora y mes con codificación cíclica (seno/coseno); día de la semana one‑hot; modelos de árboles.</td></tr>
+  <tr><td>Tendencia y quiebre por COVID: los datos son una serie de tiempo.</td><td>Partición temporal (prueba desde 2025‑10); tabla de variables desde 2023‑01.</td></tr>
+  <tr><td>El 54.6 % de las estación‑horas no tiene salidas; los conteos están muy sesgados.</td><td>Conservar los ceros; log1p en los rezagos; pérdida Poisson/Tweedie en la Fase 2.</td></tr>
+  <tr><td>Estaciones con usos distintos (trabajo, residencia, ocio).</td><td>Codificar la estación por su demanda (target encoding) y por su perfil de uso (PCA).</td></tr>
+  <tr><td>Género y edad predicen débilmente y son datos personales.</td><td>Excluirlos del modelo; solo conteos agregados.</td></tr>
+</table>
+<p class="note tabcap" id="tab-eda">Hallazgos del EDA y la decisión que tomamos con cada uno (Fase 1, notebooks 1.03 y 1.04).</p>
+<p><b>Preprocesamiento.</b> <code>features.py</code> construye 12,180,583 filas estación‑hora (486 estaciones) solo con información conocida la noche anterior: todos los rezagos están al menos 48 h atrás, para que no haya fuga de información. <code>make_preprocessor</code> es un <code>ColumnTransformer</code> de scikit‑learn (Pedregosa et al., 2011) que se ajusta solo con la partición de entrenamiento. Usa target encoding con KFold para la estación (one‑hot agregaría ~486 columnas dispersas), seno/coseno para la hora y el mes, e imputación por mediana con log1p y <code>StandardScaler</code> para los rezagos.</p>
+<p><b>Reducción de dimensionalidad.</b> Cada estación se describe por la proporción de sus viajes en cada hora de la semana y sentido (336 columnas). <b>26 componentes principales explican el 90.1 % de la varianza</b>, una reducción de 13 veces, y los tres primeros se interpretan: destino contra origen del trayecto al trabajo (28 %), ocio de fin de semana (17 %) y estaciones emisoras netas (11 %).</p>
+<figure><img src="figures/fase1/1.03_c14_2.png" alt="Viajes por día y hora"><figcaption>Porcentaje de viajes por día y hora de inicio: picos laborales a las 8:00 y 18:00 y pico de mediodía en domingo. Es la estructura que codifican las variables de tiempo y los perfiles PCA (notebook 1.03).</figcaption></figure>
+
+<h3>3.3 Modelos: entrenamiento, ajuste, evaluación y registro (Fase 2, anexo B)</h3>
+<p><b>Selección de algoritmos.</b> La demanda es un conteo disperso con interacciones fuertes entre estación, hora y día, y las ~480 estaciones comparten patrones. Por eso elegimos <b>modelos globales con pérdida de conteo</b>, uno por objetivo para todas las estaciones: GLM de Poisson, gradient boosting de scikit‑learn (Poisson y error cuadrático como contraste) y LightGBM (Poisson y Tweedie; Ke et al., 2017). Descartamos los modelos por estación (ARIMA, Prophet), que serían ~970 series sin aprender entre estaciones y no sirven para las estaciones nuevas, y las redes secuenciales, que cuestan más sin aportar información que no den ya los rezagos y el calendario. Cada candidato es un <code>Pipeline</code> preprocesador + regresor que se guarda, registra y sirve como un solo objeto, así que el pronóstico aplica exactamente las transformaciones del entrenamiento.</p>
+<p><b>El baseline que no se superaba.</b> La primera versión superaba al baseline en salidas pero no en llegadas. Al revisar por qué, encontramos dos fallas en el procesamiento y en la medición, no en el algoritmo. La primera: el WAPE horario premiaba pronosticar cero en las estaciones más tranquilas. La segunda: las 102 estaciones abiertas después del ajuste del PCA llevaban la marca «sin perfil», que el modelo había aprendido como «sin demanda». La corregimos recalculando los perfiles cada semana con las últimas 4 semanas, agregando un nivel de demanda de 7 días y comparando los grupos con el WAPE diario. Con eso, los cuatro modelos de boosting cumplieron el criterio, y pasaron al ajuste <code>lgbm_tweedie</code> y <code>hgb_poisson</code>.</p>
+<p><b>Ajuste y evaluación.</b> Para el ajuste usamos búsqueda aleatoria (Bergstra y Bengio, 2012) de 20 configuraciones más los valores por defecto, con validación temporal dentro del entrenamiento: 84 runs anidados, que mejoraron la devianza entre 1.3 % y 1.5 %. El backtest de origen móvil reentrena cada mes de 2025‑10 a 2026‑09 y pronostica el siguiente, que es lo que haría el reentrenamiento mensual (Hyndman y Athanasopoulos, 2021):</p>
+<table>
+  <tr><th>Modelo</th><th class="num">WAPE pico salidas</th><th class="num">WAPE pico llegadas</th><th class="num">WAPE diario<br>grupo 1</th><th class="num">Precisión /<br>recall decisión</th><th>Criterio</th></tr>
+  <tr class="base"><td class="mono">seasonal_naive</td><td class="num">0.653 ± 0.057</td><td class="num">0.603 ± 0.052</td><td class="num">0.444</td><td class="num">0.48 / 0.48</td><td>—</td></tr>
+  <tr class="base"><td class="mono">historical_average</td><td class="num">0.614 ± 0.081</td><td class="num">0.569 ± 0.079</td><td class="num">0.474</td><td class="num">0.57 / 0.45</td><td>mejor baseline</td></tr>
+  <tr class="pick"><td class="mono">lgbm_tweedie ✓</td><td class="num">0.520 ± 0.042</td><td class="num">0.483 ± 0.039</td><td class="num">0.334</td><td class="num">0.69 / 0.43</td><td>cumple: −15.4 % / −15.1 %</td></tr>
+  <tr><td class="mono">hgb_poisson</td><td class="num">0.521 ± 0.043</td><td class="num">0.488 ± 0.038</td><td class="num">0.335</td><td class="num">0.68 / 0.44</td><td>cumple: −15.2 % / −14.4 %</td></tr>
+</table>
+<p class="note tabcap" id="tab-backtest">Backtest de origen móvil: media ± desviación estándar de los 12 folds (notebook 2.04, runs <code>backtest-&lt;modelo&gt;</code>). WAPE del grupo 1 en salidas.</p>
+<div class="two">
+  <figure><img src="figures/fase2/2.04-peak-wape.png" alt="WAPE en hora pico"><figcaption>WAPE en hora pico, media de los 12 meses; las líneas punteadas marcan el criterio de éxito (notebook 2.04).</figcaption></figure>
+  <figure><img src="figures/fase2/2.04-importance-departures.png" alt="Importancia por permutación"><figcaption>Importancia por permutación del campeón (salidas): dominan la hora y la demanda reciente; los perfiles PCA aportan poco.</figcaption></figure>
+</div>
+<p><b>Decisión: <code>lgbm_tweedie</code> es el campeón de ambos objetivos y <code>hgb_poisson</code> el challenger.</b> Los finalistas quedan a menos de 0.005 entre sí, muy por debajo de la variación entre meses (0.04), así que el campeón gana por consistencia. Cumple el criterio en 11 de 12 meses en salidas y en 10 de 12 en llegadas (contra 7 de 12 de <code>hgb_poisson</code> en llegadas), y reentrena los 12 folds en 73 min contra 96. La ablación (runs <code>ablation-*</code>) mostró que quitar las componentes PCA empeora el WAPE entre 0.2 % y 0.6 %. Es una ayuda consistente pero marginal, y la mantuvimos porque cuesta cinco columnas por semana.</p>
+<p><b>Registro y batch.</b> Registramos <code>mibici-departures</code> y <code>mibici-arrivals</code> en el MLflow Model Registry. La versión 1 de cada uno lleva el alias <code>champion</code> y la 2 el alias <code>challenger</code>, con descripción, métricas, digests de los datos y commit del código. Promover otro modelo solo mueve el alias, sin cambiar código. <code>make predict</code> carga <code>models:/mibici-&lt;objetivo&gt;@champion</code>. Al replicar la noche del 8 de septiembre de 2026 dio un WAPE en hora pico de 0.46 en salidas y 0.42 en llegadas, y una precisión de 0.86 al marcar las estaciones desbalanceadas.</p>
+
+<h3>3.4 Pruebas unitarias y de integración</h3>
+<p><b>Método.</b> Desde la Fase 1 el repositorio sigue Cookiecutter Data Science (DrivenData, 2024) y la lógica de los notebooks vive en módulos, así que cada módulo tiene su archivo de pruebas, que corre sobre datos sintéticos pequeños (<code>tests/trip_factory.py</code>) y un MLflow temporal en SQLite. Por eso la suite no necesita los 5 GB de datos ni el servidor de MLflow y corre igual en cualquier máquina. Las pruebas que escribimos en cada fase siguieron creciendo: 163 en la Fase 1, 250 en la Fase 2 y 307 en la Fase 3.</p>
+<table>
+  <tr><th style="width:22%">Tipo</th><th>Qué comprueba</th><th style="width:26%">Archivos</th></tr>
+  <tr><td>Unitarias: datos</td><td>Las reglas del contrato de limpieza, la normalización de cada variante y la idempotencia de cada etapa</td><td class="mono">test_interim_data_cleaning, test_raw_*</td></tr>
+  <tr><td>Unitarias: preprocesamiento</td><td>Rezagos sin fuga (≥ 48 h), codificaciones y el <code>ColumnTransformer</code>; perfiles PCA</td><td class="mono">test_features, test_station_profiles</td></tr>
+  <tr><td>Unitarias: métricas</td><td>WAPE, MAE, devianza, segmentos, métrica de decisión, folds y criterio de éxito</td><td class="mono">test_evaluate</td></tr>
+  <tr><td>Unitarias: inferencia</td><td>El pronóstico y la unión con los perfiles; export de los campeones; el linaje del <code>model_card.json</code></td><td class="mono">test_predict, test_export, test_lineage</td></tr>
+  <tr><td>Serving y reproducibilidad</td><td>La API da lo mismo que <code>predict.forecast</code>; 422, 400 y 503; la prueba golden contra <code>tests/data/reference.json</code></td><td class="mono">test_serving, test_reproducibility</td></tr>
+  <tr class="pick"><td>Integración</td><td>CSV crudos → normalización → limpieza → variables → perfiles → baseline y LightGBM → campeón en el Registry → pronóstico de 24 h → métricas en el mes reservado. En cada paso revisa las columnas que lee el siguiente; también el monitoreo con datos sintéticos</td><td class="mono">test_pipeline_integration (marca integration)</td></tr>
+</table>
+<p class="note tabcap" id="tab-pruebas">Qué cubre la suite de pruebas (README, «Tests and lint»).</p>
+<p><b>Un solo comando.</b> <code>pytest -q</code>, o <code>make test</code>, que corre lo mismo. <code>pytest -q -m integration</code> corre solo las 2 pruebas de extremo a extremo y <code>make lint</code> aplica ruff al paquete y a las pruebas. <b>Resultado:</b> el 22 de noviembre de 2026, en la laptop Windows de Carlos Heinze (Ryzen 7 4800H, 16 GB) y con los campeones en <code>models/</code>, <code>pytest -q</code> dio <b>«307 passed in 204.34s»</b>: 305 unitarias y 2 de integración. Las mismas 307 pasaron en macOS (72 s) y, con la versión anterior de la suite, en un contenedor Linux limpio y en el WSL2 de Carlos Chavero (sección 3.7). <b>Decisión:</b> la prueba de integración se escribió primero (PR #50), para que cada cambio de la Fase 3 al servicio, al export o a la reproducibilidad se integrara con la suite pasando.</p>
+
+<h3>3.5 Serving con FastAPI</h3>
+<p><b>Método y por qué.</b> El batch de la Fase 2 escribe un archivo cada noche. Un servicio deja que otros sistemas pidan un pronóstico cuando lo necesitan, por ejemplo la herramienta de rutas o un tablero que recalcula el plan tras una actualización tardía. Elegimos FastAPI (Ramírez, 2026) porque genera el esquema OpenAPI y el Swagger UI a partir de los modelos de Pydantic, que validan cada fila. La alternativa, <code>mlflow models serve</code>, levanta un servidor por modelo y solo valida la firma de columnas. Nosotros necesitábamos servir salidas y llegadas juntas, calcular el flujo neto y rechazar filas fuera del contrato de datos con un mensaje útil. Tomamos dos decisiones de diseño:</p>
+<ul>
+  <li><b><code>POST /predict</code> recibe filas de variables ya construidas, no un historial.</b> Así el contenedor solo necesita el modelo, no la tabla de 12 millones de filas, y sirve igual a cualquier cliente. Un endpoint que construya las filas desde el historial quedó como trabajo futuro (#47).</li>
+  <li><b>Los modelos se exportan una vez del Registry</b> (<code>make export</code>) a <code>models/</code>, junto con un <code>model_card.json</code> que trae la versión, el run fuente, las métricas, los digests y el commit. El servicio arranca sin el servidor de MLflow, y <code>MODEL_SOURCE=registry</code> lo carga del Registry por alias si se prefiere.</li>
+</ul>
+<table class="flowing">
+  <tr><th style="width:21%">Endpoint</th><th>Devuelve</th><th style="width:30%">Códigos</th></tr>
+  <tr class="pick"><td><code>POST /predict</code></td><td>Salidas, llegadas y flujo neto esperados por estación‑hora, y la versión de cada modelo</td><td>200; 422 fila fuera del contrato; 400 lote vacío o &gt; 25,000 filas; 503 sin modelos; 500</td></tr>
+  <tr><td><code>GET /health</code></td><td>Si los modelos están cargados (lo usa el HEALTHCHECK del contenedor)</td><td>200, 503</td></tr>
+  <tr><td><code>GET /model</code></td><td>El model card de los modelos servidos</td><td>200, 503</td></tr>
+  <tr><td><code>GET /docs</code>, <code>/openapi.json</code></td><td>Swagger UI y el esquema; copia versionada en <code>docs/api/openapi.json</code></td><td>200</td></tr>
+</table>
+<p class="note tabcap" id="tab-endpoints">Endpoints del servicio. Modelos servidos: <code>models:/mibici-departures/1</code> y <code>models:/mibici-arrivals/1</code> (<code>lgbm_tweedie</code>, alias <code>champion</code>), como registra el README.</p>
+<p><b>Esquema de entrada y salida.</b> Cada fila de la petición tiene 23 campos. Son obligatorios la estación y la hora, los 8 rezagos de demanda, el día de la semana, los 4 términos cíclicos y la latitud, longitud y capacidad; las 5 componentes PCA son opcionales. Pydantic aplica los límites del contrato de datos: rezagos no negativos, día 0–6 y que coincida con la fecha, seno/coseno en [−1, 1], coordenadas dentro de Guadalajara, capacidad &gt; 0, hora local sin zona horaria. También rechaza los campos desconocidos, para que un objetivo enviado por error nunca llegue al modelo. Por ejemplo, la estación 35 a las 8:00 del 9 de septiembre de 2026 (<code>docs/api/example_request.json</code>) recibe <code>{"departures": 9.06, "arrivals": 16.17, "net_flow": 7.11}</code>.</p>
+<figure class="w80" id="fig-swagger"><img src="figures/fase3/swagger-docs.png" alt="Swagger UI del servicio"><figcaption>Swagger UI del servicio (versión 0.1.1, OpenAPI 3.1), con los tres endpoints y los esquemas de Pydantic. Captura del servicio local (<code>make serve</code>) del 22 de noviembre de 2026.</figcaption></figure>
+<p><b>Resultado.</b> El notebook 3.01 manda al servicio las 11,208 filas de la noche del 9 de septiembre de 2026 (467 estaciones × 24 h, 7.4 MB). El servicio responde en 0.28 s y <b>cada estación‑hora coincide exactamente con el batch</b>: la diferencia máxima es 0 en salidas, llegadas y flujo neto, y los totales son 14,834 salidas y 14,793 llegadas, como en la Fase 2. Las 9 peticiones inválidas del mismo notebook (día fuera de rango, rezago negativo, hora con zona horaria, estación en la Ciudad de México, objetivo enviado como variable, lote de 25,001 filas, etc.) reciben 422 o 400 con el campo y la razón. <b>Decisión:</b> cualquier consumidor del archivo nocturno puede usar el servicio, y la prueba <code>test_the_api_forecasts_equal_the_batch_forecast</code> mantiene a los dos iguales.</p>
+
+<h3>3.6 Contenedor Docker y Docker Hub</h3>
+<p><b>Método.</b> La imagen contiene el servicio y los campeones exportados, así que corre solo con Docker (Docker Inc., 2026): sin Python, sin servidor de MLflow y sin datos. Cada decisión del <code>Dockerfile</code> responde a un requisito de portabilidad o de seguridad:</p>
+<table>
+  <tr><th style="width:30%">Decisión</th><th>Por qué</th></tr>
+  <tr><td>Base <code>python:3.12.12-slim-trixie</code> fijada por digest, más <code>libgomp1</code></td><td>El mismo Python con que se entrenó; un digest no cambia aunque se republique el tag. LightGBM necesita OpenMP</td></tr>
+  <tr><td>Multi‑stage: dependencias en <code>/opt/venv</code></td><td>La etapa final no lleva compiladores ni caché de pip</td></tr>
+  <tr><td><code>requirements-serving.txt</code> con <code>requirements-lock.txt</code> como restricciones</td><td>Solo lo que necesita el servicio, con todas las versiones transitivas fijadas (desde <code>0.1.1</code>)</td></tr>
+  <tr><td>Modelos y <code>model_card.json</code> dentro de la imagen; el build falla si faltan</td><td>Un tag identifica a la vez el código y la versión de los modelos</td></tr>
+  <tr><td>Usuario <code>app</code> (uid 10001), no root; <code>HEALTHCHECK</code> a <code>/health</code> cada 30 s</td><td>Menos privilegios; el orquestador sabe si los modelos cargaron (healthy en ~10 s)</td></tr>
+  <tr><td>Etiquetas OCI: versión, commit y URIs de los modelos</td><td><code>docker image inspect</code> dice qué hay dentro sin ejecutarla</td></tr>
+</table>
+<p class="note tabcap" id="tab-docker">Decisiones del <code>Dockerfile</code> (README, «Docker image»).</p>
+<p><b>Comandos.</b> Para correr la imagen publicada: <code>docker run -d -p 8000:8000 racj90120hplmnv09/mibici-ml-service:0.1.1</code>, y luego <code>docker exec &lt;contenedor&gt; python -m team2_mlops2026.serving.app check</code>, que compara la respuesta con el ejemplo golden. Para construirla y probarla localmente: <code>make docker-build</code>, que corre <code>docker build -t ml-service:latest -t ml-service:0.1.1 .</code> con las etiquetas; <code>make docker-run</code>, que corre <code>docker run --rm -p 8000:8000 ml-service:latest</code>; y <code>make docker-smoke</code>, que arranca la imagen y la compara con el ejemplo golden. Para publicarla, <code>make docker-push</code> construye para <code>linux/amd64</code> y <code>linux/arm64</code> y sube <code>:&lt;versión&gt;</code> y <code>:latest</code>. Se niega a publicar con cambios sin commit o una versión que ya existe.</p>
+<table>
+  <tr><th>Tag</th><th>Digest</th><th>Commit</th><th>Modelos</th><th>Plataformas · tamaño comprimido</th></tr>
+  <tr class="pick"><td><code>0.1.1</code>, <code>latest</code></td><td class="mono">sha256:41eba4c22003…</td><td class="mono">29448be</td><td><code>mibici-departures/1</code>, <code>mibici-arrivals/1</code></td><td>amd64 253 MB · arm64 248 MB</td></tr>
+  <tr><td><code>0.1.0</code></td><td class="mono">sha256:8bb27ad0ec19…</td><td class="mono">f5fb9bc</td><td>los mismos</td><td>amd64 253 MB · arm64 248 MB</td></tr>
+</table>
+<p class="note tabcap" id="tab-tags">Tags publicados, consultados en la API de Docker Hub el 22 de noviembre de 2026. <code>0.1.1</code> instala desde el lock; <code>0.1.0</code> resolvía las dependencias transitivas al construir. Ambos dan los mismos pronósticos.</p>
+<figure class="w80" id="fig-dockerhub"><img src="figures/fase3/dockerhub-tags.png" alt="Docker Hub"><figcaption>La imagen en Docker Hub: tag <code>latest</code> (= <code>0.1.1</code>) para <code>linux/amd64</code> y <code>linux/arm64</code>. La página da el tamaño en MiB: 240.82 y 236.2 MiB son los 253 y 248 MB de la tabla.</figcaption></figure>
+<p><b>Resultado y decisión.</b> Los 11,208 pronósticos de la noche del 9 de septiembre son iguales en la imagen amd64 y en la arm64. Contra el servicio ejecutado directamente en macOS difieren como máximo en 1.8 × 10<sup>−15</sup>, el último bit de la exponencial de otra biblioteca de C. Por eso <code>check</code> admite una diferencia de 10<sup>−9</sup> y no de 0. Publicar las dos arquitecturas hizo que el mismo comando funcionara en las Mac con Apple silicon del equipo y en las laptops Windows e Intel.</p>
+
+<h3>3.7 Reproducibilidad en un entorno limpio</h3>
+<p><b>Método.</b> Un modelo solo es desplegable si alguien más puede reconstruirlo y obtener las mismas cifras; si no, un cambio en un pronóstico no se distingue de un cambio en el entorno. Para eso fijamos tres cosas:</p>
+<ul>
+  <li><b>Dependencias:</b> <code>requirements-lock.txt</code> fija 186 paquetes (27 directos, el resto transitivos, más 5 exclusivos de Windows); <code>make requirements</code> y la imagen instalan con él.</li>
+  <li><b>Semilla:</b> <code>features.SEED = 42</code> llega a toda fuente aleatoria: los folds del target encoding, el <code>random_state</code> de los modelos, el muestreo del ajuste y la importancia por permutación.</li>
+  <li><b>Artefactos versionados:</b> el run <code>snapshot-373aa06d7db0</code> de MLflow guarda la tabla de variables (101 MB) y los perfiles (18 MB) que entrenaron al campeón, con sus digests (<code>636e7329…</code> y <code>51c85bee…</code>), y el set de referencia: las métricas de prueba con precisión completa, filas de petición con sus pronósticos esperados y las métricas de los 14 runs <code>train-*</code>. Las versiones registradas apuntan a él con el tag <code>snapshot_run</code>, y <code>tests/data/reference.json</code> es una copia que viaja con el código.</li>
+</ul>
+<p><code>make reproduce</code> revisa los digests de la tabla local, reentrena un clon sin ajustar de cada campeón, compara sus métricas de prueba con la referencia, puntúa también el campeón exportado y, con <code>--url</code>, manda las filas de referencia al servicio. Falla con código 1 y dice qué comprobación no pasó.</p>
+<table>
+  <tr><th style="width:27%">Entorno</th><th>Reentrenamiento: máx. diferencia relativa de métricas (salidas / llegadas)</th><th style="width:25%">Servicio: pronósticos golden</th></tr>
+  <tr class="base"><td>macOS, Apple M4 Pro (máquina del snapshot)</td><td>1.4 × 10<sup>−14</sup> / 1.1 × 10<sup>−13</sup></td><td>imagen <code>0.1.1</code>: diferencia 0</td></tr>
+  <tr class="pick"><td>Contenedor Linux limpio (aarch64): clon, lock, <code>make test</code>, <code>make reproduce</code></td><td>8.4 × 10<sup>−15</sup> / 1.5 × 10<sup>−13</sup>; pronósticos a ≤ 6.3 × 10<sup>−11</sup> viajes; el campeón exportado da exactamente las métricas registradas</td><td>imagen <code>0.1.1</code> de Docker Hub: diferencia 0</td></tr>
+  <tr><td>Otra máquina: WSL2, Intel Core Ultra 9 288V (Carlos Chavero)</td><td>No ejecutado: su tabla tiene otro digest (<code>75857847…</code>, incluye octubre de 2026) y <code>compare</code> se niega a reentrenar; sus 14 runs <code>train-*</code> difieren hasta 0.037</td><td>imagen <code>0.1.1</code>: diferencia 0; <code>make test</code> 291 passed</td></tr>
+  <tr><td>Windows 10 nativo, Ryzen 7 4800H (Carlos Heinze)</td><td>No ejecutado: la tabla reconstruida tiene las mismas 12,180,583 filas y las 3,576,680 de prueba del snapshot, pero otro digest</td><td><code>serving.app check</code>: diferencia 0; prueba golden aprobada</td></tr>
+</table>
+<p class="note tabcap" id="tab-repro">Referencia contra lo reproducido en cada entorno (<code>docs/verificacion-fase3.md</code>, <code>docs/reproducibility/*.json</code>, notebook 3.02). Tolerancia de LightGBM: 10<sup>−4</sup>.</p>
+<p><b>Lo que no es bit a bit, y por qué.</b> LightGBM construye un histograma por hilo y los suma, así que con otro número de hilos las sumas van en otro orden y de vez en cuando un corte se mueve. Al reentrenar con 4 hilos en lugar de 12, el 99.9 % de los pronósticos queda a menos de 5.4 × 10<sup>−12</sup> viajes, pero unas pocas estación‑horas se mueven hasta 0.003 viajes y las métricas 4.3 × 10<sup>−6</sup> (<a class="xref" href="#fig-hilos"></a>). Eso sigue dentro de la tolerancia de 10<sup>−4</sup>, que fijamos por modelo en <code>METRIC_RTOL</code>: 10<sup>−9</sup> para los baselines y 5 × 10<sup>−3</sup> para el boosting de scikit‑learn. La justificación de cada tolerancia está en el Canvas §8.</p>
+<p><b>Hallazgo y decisión.</b> El digest de la tabla se calcula sobre los bytes del Parquet, y pandas escribe su versión en el archivo. Por eso una tabla reconstruida en otra máquina puede tener las mismas filas con otro digest, como pasó en Windows. <code>compare</code> hace bien en negarse a reentrenar en ese caso, pero obliga a compartir la tabla del snapshot en lugar de reconstruirla. <b>La reproducción del servicio sí es independiente de la máquina:</b> en los cuatro entornos la imagen devolvió los pronósticos golden con diferencia 0, y <code>make reproduce --url</code> quedó como la prueba de aceptación de cualquier despliegue.</p>
+<figure class="w65" id="fig-hilos"><img src="figures/fase3/3.02_c18_1.png" alt="Diferencia por número de hilos"><figcaption>Diferencia entre los pronósticos de un reentrenamiento y los del campeón registrado (salidas), por cuantil de las estación‑horas de prueba, en escala logarítmica. Con todos los núcleos, como se entrenó, la diferencia máxima es 8.2 × 10<sup>−12</sup> viajes; con 4 hilos, el último 0.1 % llega a 0.003 viajes (notebook 3.02).</figcaption></figure>
+
+<h3>3.8 Data drift y pérdida de desempeño</h3>
+<p><b>Método.</b> Seguimos la separación de Gama et al. (2014) y Huyen (2022) entre el cambio en las entradas y la pérdida de desempeño: un drift no siempre degrada el modelo, y reentrenar ante cada drift es caro. Por eso el monitoreo (<code>team2_mlops2026.monitoring</code>, <code>make monitor</code>) mide tres señales por separado y solo recomienda reentrenar cuando coinciden el drift y una pérdida confirmada. Usa el mismo cargador de modelos, la misma ruta de pronóstico y las mismas métricas que el servicio y la Fase 2:</p>
+<ul>
+  <li><b>Ventanas:</b> octubre de 2025 es la referencia de validación, posterior al entrenamiento del campeón. Noviembre de 2025 es el control limpio del que salen todas las simulaciones, para que la diferencia pareada aísle la intervención del calendario. Septiembre de 2026 es la réplica real, sin modificar. Cada caso se compara también con los dos baselines ajustados en la misma ventana de entrenamiento.</li>
+  <li><b>Escenarios sintéticos</b> con severidad 10, 25 y 50 %: desplazamiento de medias (rezagos y demanda), cambio solo de covariables (una agregación defectuosa), variables faltantes (perfiles, rezagos y atributos de estaciones elegidas con semilla 42), cambio estacional (picos laborales atenuados, como en vacaciones) y estaciones nuevas (IDs no vistos y sin historia).</li>
+  <li><b>Estadísticas:</b> PSI con deciles de la referencia, colas y una categoría de faltantes, para variables, pronósticos y la estación; KS como descripción, porque las estación‑horas son dependientes y su p‑valor no es confiable.</li>
+</ul>
+<table>
+  <tr><th style="width:20%">Señal</th><th>Umbral (Canvas §10)</th><th style="width:36%">Acción propuesta</th></tr>
+  <tr><td>Drift de distribución</td><td>PSI ≥ 0.10 aviso; ≥ 0.25 alerta</td><td>Seguir vigilando la distribución y el error</td></tr>
+  <tr><td>Calidad de entrada</td><td>Faltantes +10 pp en una variable, o ≥ 10 % de filas con estaciones no vistas en el entrenamiento</td><td>Revisar el <i>feature pipeline</i> y el contrato de datos; repetir la ventana</td></tr>
+  <tr><td>Desempeño</td><td>WAPE en hora pico &gt; media + 2σ del backtest (0.604 salidas / 0.561 llegadas), o mejora &lt; 10 % frente al mejor baseline de la ventana</td><td>Con drift y pérdida confirmada: <code>make train tune evaluate register</code>; mover <code>champion</code> solo si pasa el backtest</td></tr>
+</table>
+<p class="note tabcap" id="tab-umbrales">Umbrales, alertas y acciones del monitoreo. Los límites de desempeño salen de la variación mensual del backtest de la Fase 2 (<a class="xref" href="#tab-backtest"></a>).</p>
+<p><b>Resultado sobre datos históricos.</b> Los casos corrieron con los campeones v1 exportados y quedaron en el experimento <code>mibici-monitoring-historical-2026-09</code> de MLflow (<code>docs/monitoring.md</code>). La réplica de septiembre de 2026 es el run <code>drift-real-0</code>: 346,320 estación‑horas de 481 estaciones, contra la referencia de 284,742 estación‑horas de 383 estaciones.</p>
+<table class="flowing">
+  <tr><th>Caso</th><th class="num">PSI máx.</th><th class="num">Salidas: campeón / baseline</th><th class="num">Llegadas: campeón / baseline</th><th>Resultado</th></tr>
+  <tr class="base"><td>Oct 2025, referencia</td><td class="num">—</td><td class="num">0.4420 / 0.4951</td><td class="num">0.4084 / 0.4510</td><td>línea base</td></tr>
+  <tr><td>Nov 2025, control</td><td class="num">0.0515</td><td class="num">0.4721 / 0.5417</td><td class="num">0.4329 / 0.4885</td><td><code>ok</code></td></tr>
+  <tr><td>Desplazamiento de medias 25 %</td><td class="num">2.1772</td><td class="num">0.4952 / 0.5653</td><td class="num">0.4521 / 0.5174</td><td>alerta de PSI; desempeño dentro de límites</td></tr>
+  <tr><td>Variables faltantes 25 %</td><td class="num">1.9142</td><td class="num">0.5448 / 0.5417</td><td class="num">0.5132 / 0.4885</td><td>alerta de calidad; peor que el baseline en ambos</td></tr>
+  <tr><td>Cambio estacional 25 %</td><td class="num">0.0515</td><td class="num">0.4762 / 0.5919</td><td class="num">0.4423 / 0.5451</td><td><code>ok</code></td></tr>
+  <tr class="pick"><td>Sep 2026, réplica real</td><td class="num">1.6387</td><td class="num">0.5070 / 0.6125</td><td class="num">0.4838 / 0.5851</td><td>alerta de calidad: 20.79 % de filas con estaciones no vistas</td></tr>
+</table>
+<p class="note tabcap" id="tab-drift">WAPE en hora pico del campeón y del mejor baseline de la ventana en los casos históricos (<code>docs/monitoring.md</code>). El PSI máximo excluye el mes codificado y la demanda observada; en septiembre es el de la estación (<code>station_id</code>).</p>
+<figure id="fig-drift-historico"><img src="figures/fase3/drift-historico-peak-wape.png" alt="WAPE en hora pico por caso de monitoreo"><figcaption>Los valores de <a class="xref" href="#tab-drift"></a> contra el límite de alerta de cada objetivo. Las variables faltantes son el único caso en que el campeón queda peor que el baseline. En septiembre el error sube, pero sigue bajo el límite y 17 % por debajo del baseline (gráfica nuestra con los valores de <code>docs/monitoring.md</code>).</figcaption></figure>
+<p><b>Análisis.</b> En la réplica de septiembre, el WAPE en hora pico del campeón subió de 0.4420 a 0.5070 en salidas y de 0.4084 a 0.4838 en llegadas, pero quedó por debajo de los límites de 0.604 y 0.561. Además siguió 17.22 % y 17.31 % mejor que el mejor baseline del mes (naive estacional), así que <b>no hay pérdida de desempeño que justifique reentrenar</b>. Lo que sí disparó la alerta fue la calidad de entrada: 100 estaciones nunca vistas en el entrenamiento generaron el 20.79 % de las filas, con un PSI de la estación de 1.6387 y de la longitud de 0.4232. El PSI de los pronósticos (0.0238 y 0.0274) quedó bajo el aviso de 0.10. La acción propuesta es revisar el <i>feature pipeline</i> y el contrato de datos para incorporar las estaciones nuevas. Es el mismo riesgo que el Canvas anticipó en la Fase 1 y que la Fase 2 atacó con los perfiles semanales. El caso de variables faltantes muestra por qué la calidad de entrada se vigila aparte: es el único en que el campeón queda peor que el baseline (0.5448 contra 0.5417 en salidas).</p>
+<p><b>Demostración sintética.</b> El notebook 3.03 corre los mismos escenarios sobre datos sintéticos, sin la tabla histórica, en 17 runs de MLflow: 1 <code>ok</code> (el control) y 16 alertas; <a class="xref" href="#fig-psi"></a> muestra el PSI de uno de ellos. En dos casos se confirma la pérdida de desempeño: con el cambio solo de covariables al 50 %, la mejora en salidas frente al baseline cae a 4.96 %, bajo el mínimo de 10 %, y con el cambio estacional al 50 % el WAPE de llegadas supera el límite (<a class="xref" href="#fig-estacional"></a>). En ambos la acción es confirmar con etiquetas observadas y reentrenar. Los demás escenarios dan alerta de PSI o de calidad sin pérdida, y la acción es vigilar o revisar el pipeline, no reentrenar.</p>
+<figure class="w65" id="fig-estacional"><img src="figures/fase3/3.03_c19_2.png" alt="Severidad del cambio estacional"><figcaption>WAPE en hora pico al aumentar la severidad del cambio estacional sintético. Al 50 %, el WAPE de llegadas del campeón (0.5624) cruza el límite de 0.561: es el caso en que el monitoreo recomienda reentrenar (notebook 3.03).</figcaption></figure>
+<div class="two">
+  <figure id="fig-psi"><img src="figures/fase3/3.03_c19_1.png" alt="PSI por variable"><figcaption>PSI por variable en el escenario sintético de variables faltantes (25 %), con las líneas de aviso y alerta: la ubicación, la capacidad, el perfil y los rezagos se disparan; el día y la hora no (notebook 3.03).</figcaption></figure>
+  <div>
+<p><b>Limitación.</b> La réplica histórica usó la exportación compartida de la tabla (digest <code>75857847…</code>, que llega a octubre de 2026), no la del snapshot. Sus perfiles PCA difieren, lo que mueve los pronósticos hasta 0.554 salidas en las filas golden, y el run registra esa diferencia de digests. Las cifras de septiembre describen esa exportación; repetir la réplica con la tabla del snapshot es la comparación exacta pendiente.</p>
+  </div>
+</div>
+
+<h2 id="roles"><span class="n">4</span>Roles, interacción y actividad en GitHub</h2>
+<p>Los roles cambiaron entre fases según lo que pedía cada una, pero siempre cubrieron el ciclo completo de MLOps: datos → modelo → operación → verificación. La tabla da los issues y PR de cada persona; la de actividad, sus commits. La sección 6 de cada anexo detalla los roles de las fases 1 y 2.</p>
+<table class="flowing">
+  <tr><th style="width:15%">Integrante</th><th style="width:22%">Fase 1</th><th style="width:27%">Fase 2</th><th>Fase 3</th></tr>
+  <tr><td>Carlos Antonio Heinze Mortera</td><td><b>Data Engineer.</b> Extracción, normalización, contrato de limpieza y EDA (#1, #3, #5; PR #2, #4, #6).</td><td><b>ML Engineer.</b> Planeó los issues #22–#29; métricas y folds, baselines, candidatos y ajuste (PR #30–#33); rediseñó el procesamiento cuando la primera versión no superó al baseline.</td><td><b>ML Engineer y QA.</b> Planeó los issues #38–#49 con sus criterios de aceptación. Prueba de integración extremo a extremo y comando único (#38, PR #50). Revisó e integró los PR #55 y #56 de Julián. Verificación nativa en Windows y su corrección (PR #57). Este reporte (#44).</td></tr>
+  <tr><td>Javier Ramírez</td><td><b>ML / MLOps Engineer.</b> ML Canvas, tabla estación‑hora, PCA y linaje en MLflow (PR #17–#20).</td><td><b>MLOps Engineer.</b> Reproducción en un segundo equipo, backtest y ablación, Model Registry, pronóstico batch y <code>make pipeline</code> (PR #34–#36).</td><td><b>MLOps Engineer.</b> Export de los campeones y servicio FastAPI (#39, PR #51); imagen Docker y publicación en Docker Hub (#40, PR #52); lock, snapshot, set de referencia y reproducción en contenedor limpio (#41, PR #53); herramienta del reporte final (PR #54).</td></tr>
+  <tr><td>Julián Malo Romero</td><td><b>DevOps.</b> Entorno Python 3.12, dependencias, <code>Makefile</code> y verificación en Windows (PR #21).</td><td><b>DevOps y documentación.</b> Reporte ejecutivo y video (#29); verificación de cifras contra MLflow y los notebooks.</td><td><b>ML Engineer de monitoreo y DevOps.</b> Escenarios de drift, PSI y KS, umbrales, alertas y la réplica de septiembre de 2026 (#42, PR #55). Integró la Fase 3 al <code>Makefile</code>, el README y el linaje del export (#43, PR #56).</td></tr>
+  <tr><td>Carlos Arturo Chavero Cruz</td><td><b>QA y documentación.</b> Validación de cifras contra MLflow y las pruebas.</td><td><b>QA y documentación.</b> Reporte ejecutivo y video de la fase (#29).</td><td><b>QA de reproducibilidad.</b> Corrió el pipeline, la suite y la comparación con la imagen publicada en una segunda máquina (WSL2, Intel), y documentó el resultado y la diferencia de digests (commit <code>d8d2d2d</code>, <code>maquina-carlos-wsl.json</code>).</td></tr>
+</table>
+<p class="note tabcap" id="tab-roles">Rol y actividades de cada integrante por fase, con sus issues y pull requests (<code>docs/roles.md</code> y GitHub).</p>
+<p><b>Cómo se alinean con el ciclo MLOps.</b> Entre roles, el contrato no es un acuerdo verbal: es un artefacto que se puede comprobar. En la Fase 1 fue el digest de cada tabla y en la Fase 2 el run de ajuste y el alias del Registry. En la Fase 3 la cadena se alargó hasta la operación:</p>
+<div class="flow">
+  <div class="st"><b>ML Engineer</b>campeón registrado + prueba de integración<div class="d">@champion · pytest -q</div></div><div class="ar">→</div>
+  <div class="st"><b>MLOps Engineer</b>export, API, imagen, snapshot<div class="d">model_card · :0.1.1 · snapshot</div></div><div class="ar">→</div>
+  <div class="st"><b>Monitoreo / DevOps</b>drift sobre los modelos servidos; Makefile<div class="d">drift-* · make monitor</div></div><div class="ar">→</div>
+  <div class="st"><b>QA</b>reproduce en otra máquina<div class="d">reference.json · diff 0</div></div><div class="ar">→</div>
+  <div class="st"><b>Documentación</b>cifras contra su fuente<div class="d">report.py check</div></div>
+</div>
+<p class="note figcap" id="fig-entregas">Entregas entre roles en la Fase 3; debajo de cada rol, el artefacto que entrega al siguiente.</p>
+<ul>
+  <li>El servicio carga exactamente la versión que tenía el alias <code>champion</code>, y su <code>model_card.json</code> trae el run, los digests y el commit; <code>test_lineage</code> lo comprueba contra el Registry.</li>
+  <li>El monitoreo carga los modelos con el mismo cargador que el servicio, y cada run <code>drift-*</code> registra los digests de sus entradas, también cuando no coinciden con los del campeón.</li>
+  <li>QA no le pide los resultados a quien los obtuvo. Los vuelve a obtener con <code>tests/data/reference.json</code> y la imagen publicada, y deja un JSON comparable en <code>docs/reproducibility/</code>.</li>
+  <li>Cada issue llegó con su alcance y sus criterios de aceptación. Carlos Heinze revisó e integró los PR de Julián (#55 y #56), y Copilot revisó el #50. Los de Javier (#51–#54) se integraron sin una revisión registrada en GitHub; su revisión cruzada fue la reproducción en el contenedor limpio, en el WSL2 de Carlos Chavero y en Windows.</li>
+</ul>
+<h3>Actividad en el repositorio</h3>
+<!-- activity:start -->
+<table class="activity">
+  <tr><th style="width:22%">Fase 1 · hasta el 25/10</th><th class="num" style="width:7%">Commits</th><th style="width:14%">PR propios</th><th style="width:13%">PR revisados o integrados</th><th>Issues abiertos</th><th style="width:14%">Issues asignados</th><th class="num" style="width:9%">Comentarios</th></tr>
+  <tr><td>Carlos Antonio Heinze Mortera<div class="note">CarlosHeinze</div></td><td class="num">15</td><td><a href="https://github.com/CarlosHeinze/MLOps_Team2/pull/2">#2</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/pull/4">#4</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/pull/6">#6</a></td><td>—</td><td><a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/1">#1</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/3">#3</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/5">#5</a></td><td><a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/1">#1</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/5">#5</a></td><td class="num">0</td></tr>
+  <tr><td>Javier Ramírez<div class="note">javieramirez90</div></td><td class="num">20</td><td><a href="https://github.com/CarlosHeinze/MLOps_Team2/pull/17">#17</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/pull/18">#18</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/pull/19">#19</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/pull/20">#20</a></td><td><a href="https://github.com/CarlosHeinze/MLOps_Team2/pull/6">#6</a></td><td><a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/7">#7</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/8">#8</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/9">#9</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/10">#10</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/11">#11</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/12">#12</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/13">#13</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/14">#14</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/15">#15</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/16">#16</a></td><td><a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/7">#7</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/8">#8</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/9">#9</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/10">#10</a></td><td class="num">0</td></tr>
+  <tr><td>Julián Malo Romero<div class="note">JulianMaloRomeroTEC</div></td><td class="num">2</td><td><a href="https://github.com/CarlosHeinze/MLOps_Team2/pull/21">#21</a></td><td>—</td><td>—</td><td>—</td><td class="num">0</td></tr>
+  <tr><td>Carlos Arturo Chavero Cruz<div class="note">chaverocarlos</div></td><td class="num">0</td><td>—</td><td>—</td><td>—</td><td>—</td><td class="num">0</td></tr>
+</table>
+<table class="activity">
+  <tr><th style="width:22%">Fase 2 · 26/10 – 8/11</th><th class="num" style="width:7%">Commits</th><th style="width:14%">PR propios</th><th style="width:13%">PR revisados o integrados</th><th>Issues abiertos</th><th style="width:14%">Issues asignados</th><th class="num" style="width:9%">Comentarios</th></tr>
+  <tr><td>Carlos Antonio Heinze Mortera<div class="note">CarlosHeinze</div></td><td class="num">8</td><td><a href="https://github.com/CarlosHeinze/MLOps_Team2/pull/30">#30</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/pull/31">#31</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/pull/32">#32</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/pull/33">#33</a></td><td><a href="https://github.com/CarlosHeinze/MLOps_Team2/pull/37">#37</a></td><td><a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/22">#22</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/23">#23</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/24">#24</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/25">#25</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/26">#26</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/27">#27</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/28">#28</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/29">#29</a></td><td>—</td><td class="num">0</td></tr>
+  <tr><td>Javier Ramírez<div class="note">javieramirez90</div></td><td class="num">6</td><td><a href="https://github.com/CarlosHeinze/MLOps_Team2/pull/34">#34</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/pull/35">#35</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/pull/36">#36</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/pull/37">#37</a></td><td>—</td><td>—</td><td><a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/26">#26</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/27">#27</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/28">#28</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/29">#29</a></td><td class="num">0</td></tr>
+  <tr><td>Julián Malo Romero<div class="note">JulianMaloRomeroTEC</div></td><td class="num">0</td><td>—</td><td>—</td><td>—</td><td>—</td><td class="num">0</td></tr>
+  <tr><td>Carlos Arturo Chavero Cruz<div class="note">chaverocarlos</div></td><td class="num">0</td><td>—</td><td>—</td><td>—</td><td>—</td><td class="num">0</td></tr>
+</table>
+<table class="activity">
+  <tr><th style="width:22%">Fase 3 · desde el 9/11</th><th class="num" style="width:7%">Commits</th><th style="width:14%">PR propios</th><th style="width:13%">PR revisados o integrados</th><th>Issues abiertos</th><th style="width:14%">Issues asignados</th><th class="num" style="width:9%">Comentarios</th></tr>
+  <tr><td>Carlos Antonio Heinze Mortera<div class="note">CarlosHeinze</div></td><td class="num">5</td><td><a href="https://github.com/CarlosHeinze/MLOps_Team2/pull/50">#50</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/pull/57">#57</a></td><td><a href="https://github.com/CarlosHeinze/MLOps_Team2/pull/55">#55</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/pull/56">#56</a></td><td><a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/38">#38</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/39">#39</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/40">#40</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/41">#41</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/42">#42</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/43">#43</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/44">#44</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/45">#45</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/46">#46</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/47">#47</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/48">#48</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/49">#49</a></td><td>—</td><td class="num">1</td></tr>
+  <tr><td>Javier Ramírez<div class="note">javieramirez90</div></td><td class="num">15</td><td><a href="https://github.com/CarlosHeinze/MLOps_Team2/pull/51">#51</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/pull/52">#52</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/pull/53">#53</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/pull/54">#54</a></td><td>—</td><td>—</td><td><a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/39">#39</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/40">#40</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/issues/41">#41</a></td><td class="num">1</td></tr>
+  <tr><td>Julián Malo Romero<div class="note">JulianMaloRomeroTEC</div></td><td class="num">3</td><td><a href="https://github.com/CarlosHeinze/MLOps_Team2/pull/55">#55</a>, <a href="https://github.com/CarlosHeinze/MLOps_Team2/pull/56">#56</a></td><td>—</td><td>—</td><td>—</td><td class="num">0</td></tr>
+  <tr><td>Carlos Arturo Chavero Cruz<div class="note">chaverocarlos</div></td><td class="num">1</td><td>—</td><td>—</td><td>—</td><td>—</td><td class="num">0</td></tr>
+</table>
+<p class="note">Generado el 22/11/2026 desde <code>origin/master</code> y la API de GitHub (<code>report.py activity</code>). En total: CarlosHeinze, 28 commits y 9 PR; javieramirez90, 41 commits y 12 PR; JulianMaloRomeroTEC, 5 commits y 3 PR; chaverocarlos, 1 commits y 0 PR. Commits sin merges; un PR o issue cuenta en la fase de su fecha de creación.</p>
+<!-- activity:end -->
+
+<h2 id="conclusiones"><span class="n">5</span>Conclusiones generales</h2>
+<p><b>Cómo resolvimos el problema del Canvas.</b> El operador necesitaba saber la noche anterior qué estaciones se vaciarán o llenarán. Hoy un modelo que supera al mejor baseline en 15 % en las horas que deciden la redistribución entrega ese pronóstico de dos formas: en batch cada noche y en línea con una imagen que cualquiera puede correr con un comando. Se puede reconstruir y comprobar en otra máquina, y lo vigila un monitoreo que ya detectó el cambio más importante de la red, las ~100 estaciones nuevas de 2026.</p>
+<p style="break-after: avoid"><b>Estrategias que usamos.</b></p>
+<ul>
+  <li><b>Decidir antes de medir:</b> el criterio de éxito, los umbrales de drift y las tolerancias de reproducibilidad se fijaron y justificaron antes de ver los resultados, en el Canvas §4, §8 y §10.</li>
+  <li><b>Cada entrega es un artefacto comprobable:</b> un digest, un run, un alias, un tag de imagen, un <code>reference.json</code>. Así cuatro personas con máquinas distintas pudieron trabajar en paralelo sin depender de lo que otra dijera.</li>
+  <li><b>Un baseline en todo:</b> en el entrenamiento, en el backtest y en cada ventana de monitoreo. Un error que sube no es una pérdida si el modelo sigue superando al baseline del mismo mes.</li>
+  <li><b>Módulos con pruebas y notebooks que explican:</b> la lógica vive en el paquete; los notebooks solo ejecutan, verifican y terminan cada resultado en una decisión («Result → action»).</li>
+</ul>
+<p style="break-after: avoid"><b>Lecciones aprendidas.</b></p>
+<ul>
+  <li><b>Las variables y la medición pesan más que el algoritmo.</b> El campeón no se logró cambiando de modelo. Se logró al descubrir que el WAPE horario premiaba pronosticar cero y que las estaciones nuevas parecían vacías. El ajuste aportó 1.3–1.5 % y el PCA 0.2–0.6 %.</li>
+  <li><b>«Reproducible» necesita una definición.</b> El servicio es idéntico en todas partes, pero el reentrenamiento de LightGBM depende del número de hilos. Documentar por qué y con qué tolerancia (10<sup>−4</sup>) fue más útil que prometer igualdad bit a bit. Las otras máquinas revelaron algo que ninguna prueba local mostraba: el digest del Parquet cambia con la versión de pandas.</li>
+  <li><b>Drift no es lo mismo que degradación.</b> En septiembre de 2026 hubo drift fuerte en la estación y en la ubicación, pero el modelo siguió 17 % mejor que el baseline. Reentrenar ante cada alarma habría sido caro y no habría corregido la causa, que son los datos de las estaciones nuevas.</li>
+  <li><b>Probar en el sistema operativo de cada integrante.</b> La verificación nativa en Windows encontró un <code>Makefile</code> que no corría sin argumentos y una prueba intermitente por marcas de tiempo. Los dos se corrigieron en el PR #57.</li>
+</ul>
+<table>
+  <tr><th style="width:42%">Área de mejora identificada</th><th style="width:12%">Fase</th><th>Estado al cierre</th></tr>
+  <tr><td>Bloquear las dependencias transitivas</td><td>1</td><td><b>Resuelta:</b> <code>requirements-lock.txt</code> (186 paquetes), usado por <code>make requirements</code> y la imagen</td></tr>
+  <tr><td>Estrategias de faltantes como versiones del dataset; OOP donde reduzca duplicación (#11, #14)</td><td>1</td><td><b>Resuelta:</b> issues cerrados antes de la Fase 2</td></tr>
+  <tr><td>Monitorear cada mes el WAPE y el drift de las estaciones nuevas</td><td>2</td><td><b>Resuelta:</b> <code>make monitor</code> con umbrales y acciones (#42)</td></tr>
+  <tr><td>Desplegar el pronóstico como servicio</td><td>2</td><td><b>Resuelta en parte:</b> API e imagen publicadas; falta la corrida programada (#49)</td></tr>
+  <tr><td>Un servidor de MLflow compartido</td><td>1, 2</td><td><b>Pendiente:</b> cada integrante tiene su MLflow local, y por eso el snapshot se compartió como carpeta y hubo tablas con otro digest</td></tr>
+  <tr><td>Tareas largas en una VM; Optuna y Polars</td><td>2</td><td><b>Pendiente</b></td></tr>
+  <tr><td>Revisión obligatoria de cada PR e integración continua</td><td>3</td><td><b>Pendiente:</b> cuatro PR de la Fase 3 entraron sin revisión registrada; CI con GitHub Actions (#45)</td></tr>
+</table>
+<p class="note tabcap" id="tab-mejoras">Áreas de mejora de los reportes de las fases 1 y 2, y las nuevas de la Fase 3, con su estado al cierre del proyecto.</p>
+<p style="break-after: avoid"><b>Trabajo futuro y recomendaciones.</b></p>
+<ul>
+  <li><b>Compartir el snapshot y el registro, no reconstruirlos:</b> un servidor de MLflow con almacenamiento remoto y la tabla del snapshot en DVC (#46, #48). También calcular el digest sobre el contenido ordenado de la tabla y no sobre los bytes del Parquet, como ya hace el monitoreo.</li>
+  <li><b>Reentrenamiento determinista:</b> fijar <code>n_jobs</code> y <code>deterministic=True</code> en el próximo reentrenamiento, para que el campeón sea bit a bit en cualquier máquina.</li>
+  <li><b>Cerrar el ciclo de monitoreo:</b> un endpoint <code>/forecast</code> que construya las filas desde el historial y registre lo servido (#47), y el monitoreo mensual con reentrenamiento condicionado al backtest (#49). Los umbrales actuales son iniciales y deben calibrarse con un piloto antes de usarse para decisiones reales.</li>
+  <li><b>Proteger <code>master</code>:</b> CI con lint, pruebas y build de la imagen en cada PR (#45), y al menos una aprobación antes de integrar.</li>
+  <li><b>Con el operador:</b> el inventario de bicicletas en vivo (sin él la decisión del Canvas no se puede automatizar), clima y festivos como variables, pronósticos por cuantiles para las horas pico y un umbral de alerta acordado que suba el recall de 0.43 de la métrica de decisión.</li>
+</ul>
+
+<h2 id="ia"><span class="n">6</span>Declaración de uso de inteligencia artificial</h2>
+<p>El equipo utilizó las siguientes herramientas de IA. Todo el código se revisó y ejecutó, y todas las cifras de este documento provienen de ejecutar ese código sobre los datos reales; ningún resultado fue generado por la IA sin esa ejecución. La responsabilidad final del contenido es del equipo.</p>
+<ul>
+  <li>Anthropic. (2026). <i>Claude Code</i> (basado en Claude Opus 5.5) [Modelo de lenguaje grande]. https://claude.com/claude-code. Usado en las tres fases por Carlos Heinze y Javier Ramírez para generar y depurar código y pruebas, ejecutar y verificar notebooks, analizar resultados, tomar capturas de MLflow y redactar documentación, descripciones de PR y los reportes. En la Fase 3 lo usaron para la prueba de integración, el servicio, la imagen, la reproducibilidad, la verificación en Windows y este reporte, cuyas cifras se tomaron de los runs, notebooks y documentos citados. En la Fase 1 también llenó el ML Canvas mediante Claude in Chrome.</li>
+  <li>OpenAI. (2026). <i>Codex</i> (GPT‑6 Sol con razonamiento medio en la Fase 1; GPT‑6.2 Sol con razonamiento alto en la Fase 3) [Modelo de lenguaje grande]. https://openai.com/codex/. Usado por Julián Malo Romero. En la Fase 1 (PR #21), para revisar el repositorio, identificar problemas de reproducibilidad, corregir el <code>Makefile</code>, las dependencias y la configuración de MLflow, y preparar documentación. En la Fase 3 (PR #55 y #56), para desarrollar y revisar la simulación de drift, el monitoreo, las alertas, las pruebas y el registro en MLflow (#42), y para integrar los comandos del <code>Makefile</code>, la documentación, las dependencias y las pruebas de trazabilidad (#43).</li>
+  <li>OpenAI. (2026). <i>ChatGPT</i> [Modelo de lenguaje grande]. https://chatgpt.com/. Usado por Julián Malo Romero en las tres fases: en las fases 1 y 3, junto con Codex en las tareas anteriores; en la Fase 2 (#29), para revisar los requisitos de la rúbrica, organizar la presentación, preparar su intervención en el video y revisar la documentación del equipo.</li>
+  <li>Google. (2026). <i>Gemini</i> (Gemini 4 Hydrogen, con nivel de razonamiento bajo) [Modelo de lenguaje grande]. https://gemini.google.com/. Usado por Carlos Arturo Chavero Cruz en las tres fases, en sus actividades: la validación de cifras contra MLflow y las pruebas (Fase 1), el reporte ejecutivo y el video (Fase 2, #29) y la reproducción en una segunda máquina con WSL2 (Fase 3).</li>
+  <li>GitHub. (2026). <i>GitHub Copilot</i> [Asistente de programación basado en modelos de lenguaje]. https://github.com/features/copilot. Revisión automática de los pull requests #30, #31, #33 y #50, y una corrección sugerida (Copilot Autofix) en la Fase 1.</li>
+</ul>
+<p class="note">Cada integrante declaró personalmente sus herramientas, su propósito y su alcance (<code>docs/ai-usage.md</code>). Julián declaró además que revisó lo que la IA le ayudó a producir, mantuvo las pruebas y evidencias correspondientes y no presentó resultados sintéticos como datos reales.</p>
+
+<h2 id="referencias">Referencias</h2>
+<div class="refs">
+  <p>Bergstra, J. y Bengio, Y. (2012). Random search for hyper-parameter optimization. <i>Journal of Machine Learning Research</i>, 13, 281–305.</p>
+  <p>Docker Inc. (2026). <i>Docker documentation</i>. https://docs.docker.com/</p>
+  <p>Dorard, L. (2015). <i>Machine Learning Canvas</i> (v1.2). OWNML. https://www.ownml.co/</p>
+  <p>DrivenData. (2024). <i>Cookiecutter Data Science</i> (v2). https://cookiecutter-data-science.drivendata.org/</p>
+  <p>Gama, J., Žliobaitė, I., Bifet, A., Pechenizkiy, M. y Bouchachia, A. (2014). A survey on concept drift adaptation. <i>ACM Computing Surveys</i>, 46(4), 1–37.</p>
+  <p>Huyen, C. (2022). <i>Designing machine learning systems: An iterative process for production-ready applications</i>. O'Reilly Media.</p>
+  <p>Hyndman, R. J. y Athanasopoulos, G. (2021). <i>Forecasting: Principles and practice</i> (3.ª ed.). OTexts. https://otexts.com/fpp3/</p>
+  <p>Ke, G. et al. (2017). LightGBM: A highly efficient gradient boosting decision tree. <i>Advances in Neural Information Processing Systems</i>, 30.</p>
+  <p>Kreuzberger, D., Kühl, N. y Hirschl, S. (2023). Machine learning operations (MLOps): Overview, definition, and architecture. <i>IEEE Access</i>, 11, 31866–31879.</p>
+  <p>MiBici. (2026). <i>Datos abiertos</i>. https://mibici.net/es/datos-abiertos/</p>
+  <p>MLflow Project. (2026). <i>MLflow Tracking</i> y <i>MLflow Model Registry</i>. https://mlflow.org/docs/latest/</p>
+  <p>Pedregosa, F. et al. (2011). Scikit-learn: Machine learning in Python. <i>Journal of Machine Learning Research</i>, 12, 2825–2830.</p>
+  <p>Ramírez, S. (2026). <i>FastAPI</i>. https://fastapi.tiangolo.com/</p>
+  <p>Sculley, D. et al. (2015). Hidden technical debt in machine learning systems. <i>Advances in Neural Information Processing Systems</i>, 28.</p>
+</div>
+
+<h2 id="anexos" class="page-break">Anexos: reportes entregados de las fases 1 y 2</h2>
+<p>Para que los resultados de las fases anteriores queden completos en esta entrega, después de esta página se incluyen los dos reportes tal como se entregaron, sin cambios y con su propia numeración de páginas, figuras y tablas. Las secciones 3.1 a 3.3 y 4 de este reporte los condensan con las mismas cifras; los anexos tienen el detalle, las figuras de MLflow y la discusión completa de cada fase.</p>
+<table>
+  <tr><th style="width:9%">Anexo</th><th style="width:27%">Reporte</th><th style="width:12%">Entregado</th><th class="num" style="width:8%">Páginas</th><th>Contenido</th><th style="width:12%">Aquí, en</th></tr>
+  <tr><td><b>A</b></td><td>Fase 1 · <i>MiBici: una base de datos trazable para pronosticar la demanda por estación</i></td><td>25 oct 2026</td><td class="num">8</td><td>ML Canvas; extracción, normalización y limpieza con contrato de datos; experimento A/B/C de faltantes; EDA y preprocesamiento; PCA; versionado en MLflow; estructura Cookiecutter; roles; conclusiones</td><td>1.1, 3.1, 3.2, 4</td></tr>
+  <tr><td><b>B</b></td><td>Fase 2 · <i>MiBici: del baseline al modelo campeón en el MLflow Model Registry</i></td><td>8 nov 2026</td><td class="num">10</td><td>Métricas y criterio de éxito; refactorización; pipeline de scikit‑learn; selección, entrenamiento, ajuste y backtest de 12 meses; ablación de PCA; tracking, visualización y Model Registry; pronóstico batch; roles; conclusiones</td><td>3.3, 4, 5</td></tr>
+</table>
+<p class="note tabcap" id="tab-anexos">Reportes anexos al final de este PDF (<code>reports/Fase1_Equipo02.pdf</code> y <code>reports/Fase2_Equipo02.pdf</code> en el repositorio).</p>
+
+<script>
+  // Numbers figures and tables in the order they appear, so sections can be written in any order.
+  // A figure caption is a <figcaption> or a <p class="note figcap">; a table caption is a
+  // <p class="note tabcap"> after its table. Captions carry no number of their own. Refer to one
+  // with an empty link of class xref to its id; the id goes on the <figure> or on the caption.
+  (() => {
+    const label = { fig: "Figura", tab: "Tabla" };
+    const count = { fig: 0, tab: 0 };
+    const numbers = {};
+    document.querySelectorAll("figcaption, .figcap, .tabcap").forEach((caption) => {
+      const kind = caption.classList.contains("tabcap") ? "tab" : "fig";
+      const text = `${label[kind]} ${++count[kind]}`;
+      const id = caption.id || caption.closest("figure")?.id;
+      if (id) numbers[id] = text;
+      caption.insertAdjacentHTML("afterbegin", `<b class="num-label">${text}.</b> `);
+    });
+    document.querySelectorAll("a.xref").forEach((ref) => {
+      const text = numbers[ref.getAttribute("href").slice(1)];
+      ref.textContent = text || "¿referencia?";
+      if (!text) ref.classList.add("todo");
+    });
+  })();
+</script>
+</body>
+</html>

@@ -186,6 +186,12 @@ forecast, so both baselines fall back to a simpler rule where their own rule has
   `models:/mibici-<target>@champion` from the Model Registry and forecasts the 24 hours after the
   last data for every station with a trip in the last 28 days. For 1 October 2026 it wrote
   11,232 forecasts (468 stations × 24 h) in about 10 seconds.
+- **Online (Phase 3):** `POST /predict` (FastAPI, `make serve`) serves the same champions,
+  exported from the Registry to `models/` with `model_card.json`
+  (`models:/mibici-departures/1`, `models:/mibici-arrivals/1`). The Docker image
+  `racj90120hplmnv09/mibici-ml-service:0.1.1` (amd64 and arm64) carries the service and the
+  models. For the night of 9 September 2026 its 11,208 forecasts equal the batch forecast
+  exactly (notebook `3.01`).
 
 ## 6. Data collection
 

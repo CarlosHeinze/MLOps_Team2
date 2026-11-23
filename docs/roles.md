@@ -1,5 +1,27 @@
 # Roles, actividades e interacción
 
+## Fase 3: pruebas, serving, Docker, reproducibilidad y drift
+
+Carlos abrió los issues #38 a #49 con su alcance y sus criterios de aceptación; #38 a #44 eran
+obligatorios y #45 a #49 opcionales (quedaron abiertos).
+
+| Integrante | Rol | Issues | Pull requests | Entrega a la siguiente etapa |
+|---|---|---|---|---|
+| CarlosHeinze | ML Engineer y QA | [#38](https://github.com/CarlosHeinze/MLOps_Team2/issues/38), [#44](https://github.com/CarlosHeinze/MLOps_Team2/issues/44) | [#50](https://github.com/CarlosHeinze/MLOps_Team2/pull/50), [#57](https://github.com/CarlosHeinze/MLOps_Team2/pull/57); revisó e integró #55 y #56 | Prueba de integración y `pytest -q`; verificación nativa en Windows; reporte final |
+| javieramirez90 | MLOps Engineer | [#39](https://github.com/CarlosHeinze/MLOps_Team2/issues/39), [#40](https://github.com/CarlosHeinze/MLOps_Team2/issues/40), [#41](https://github.com/CarlosHeinze/MLOps_Team2/issues/41) | [#51](https://github.com/CarlosHeinze/MLOps_Team2/pull/51), [#52](https://github.com/CarlosHeinze/MLOps_Team2/pull/52), [#53](https://github.com/CarlosHeinze/MLOps_Team2/pull/53), [#54](https://github.com/CarlosHeinze/MLOps_Team2/pull/54) | Campeones exportados con `model_card.json`, servicio FastAPI, imagen `0.1.1` en Docker Hub, run snapshot y `tests/data/reference.json` |
+| JulianMaloRomeroTEC | ML Engineer de monitoreo y DevOps | [#42](https://github.com/CarlosHeinze/MLOps_Team2/issues/42), [#43](https://github.com/CarlosHeinze/MLOps_Team2/issues/43) | [#55](https://github.com/CarlosHeinze/MLOps_Team2/pull/55), [#56](https://github.com/CarlosHeinze/MLOps_Team2/pull/56) | Monitoreo de drift (`make monitor`, runs `drift-*`) y la Fase 3 integrada en el `Makefile` y el README |
+| chaverocarlos | QA de reproducibilidad | [#41](https://github.com/CarlosHeinze/MLOps_Team2/issues/41) | commit `d8d2d2d` | Reproducción en una segunda máquina (WSL2): `docs/reproducibility/maquina-carlos-wsl.json` |
+
+### Entregas entre roles
+
+1. **ML Engineer → MLOps Engineer:** el campeón con alias `champion` y la prueba de integración,
+   que debe pasar con cada cambio.
+2. **MLOps Engineer → monitoreo y QA:** `models/` con `model_card.json` (versión, run, digests,
+   commit), la imagen con tag y el set de referencia del snapshot.
+3. **Monitoreo → equipo:** cada run `drift-*` registra los digests de sus entradas, las alertas
+   y la acción propuesta.
+4. **QA → documentación:** un JSON comparable por entorno en `docs/reproducibility/`.
+
 ## Fase 2: construcción, ajuste, evaluación y registro de modelos
 
 Carlos abrió los issues #22 a #29 con su alcance y sus criterios de aceptación antes de empezar.
