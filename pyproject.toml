@@ -27,6 +27,8 @@ markers = [
 filterwarnings = [
     # Raised inside MLflow's SQLite tracking store, not by this project
     "ignore:The ``noload`` loader strategy is deprecated:DeprecationWarning",
+    # Raised by pandas 3.1 inside MLflow's input-example check when a model is loaded
+    "ignore:Operation with range is deprecated:DeprecationWarning:mlflow.models.utils",
 ]
 
 [tool.coverage.run]

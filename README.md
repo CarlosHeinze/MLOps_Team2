@@ -41,7 +41,7 @@ reads only the previous step's output, so any step can be re-run on its own.
 | 11. Batch forecast | `team2_mlops2026.modeling.predict` | `data/processed/mibici/predictions/forecast_<YYYYMMDD_HH>h.parquet` and a `predict-<start>` run | `2.05` |
 | 12. Model export | `team2_mlops2026.modeling.export` | `models/mibici-<target>/`: each champion as registered, plus `models/model_card.json` | `3.01` |
 | 13. Online serving | `team2_mlops2026.serving.app` (`make serve`) | `POST /predict`, `GET /health` and `GET /model` on port 8000, with the schema in `docs/api/` | [`3.01`](notebooks/3.01-team2-model-serving.ipynb) |
-| 14. Container | `Dockerfile` (`make docker-build`, `make docker-run`, `make docker-push`) | Image [`racj90120hplmnv09/mibici-ml-service`](https://hub.docker.com/r/racj90120hplmnv09/mibici-ml-service) on Docker Hub for amd64 and arm64 | [`3.01`](notebooks/3.01-team2-model-serving.ipynb), [`3.02`](notebooks/3.02-team2-reproducibility.ipynb) |
+| 14. Container | `Dockerfile` (`make docker-build`, `make docker-run`, `make docker-push`) | Image [`racj90120hplmnv09/mibici-ml-service`](https://hub.docker.com/r/racj90120hplmnv09/mibici-ml-service) on Docker Hub for amd64 and arm64 | [`3.02`](notebooks/3.02-team2-reproducibility.ipynb) (checks the image's forecasts) |
 | 15. Reproducibility | `team2_mlops2026.modeling.reproducibility` (`make snapshot`, `make reproduce` or `make compare`) | `snapshot-<digest>` run with the champions' tables and reference outputs, `tests/data/reference.json`, `reproduce-<model>` runs | [`3.02`](notebooks/3.02-team2-reproducibility.ipynb) |
 | 16. Drift monitoring | `team2_mlops2026.monitoring` (`make monitor`) | `data/processed/mibici/monitoring/` and one `drift-<scenario>-<severity>` MLflow run per tracked case | [`3.03`](notebooks/3.03-team2-data-drift.ipynb) |
 
@@ -76,6 +76,15 @@ For replay on a machine with limited RAM, reuse the exported models and feature 
 The commands above require no raw-data download or champion refit. The full reproducibility
 comparison is a separate check and refits by default. See [Reproducibility](#7-reproducibility).
 
+Use the team's tables rather than `make features` when the results have to match the
+champions'. The champions were trained on the snapshot tables, with the digests
+`636e73295b9d...` (features) and `51c85bee5c11...` (profiles) of `tests/data/reference.json`.
+The digest covers the bytes of the Parquet file, and pandas writes its version into it, so a
+table rebuilt on another machine can hold the same rows under another digest. On 22 Nov 2026 a
+rebuild on Windows from the `data/processed` of 24 Oct 2026 gave 12,180,583 rows, with the
+same 3,576,680 test rows as the snapshot, but other digests. With other digests the refit of
+`make reproduce` stops, and `make monitor` runs and records the mismatch on its runs.
+
 ### 1. Environment
 
 `make` requires GNU Make. On macOS a native LightGBM import needs the OpenMP runtime.
@@ -87,21 +96,16 @@ make requirements                  # installs into .venv with requirements-lock.
 cp .env.example .env               # local MLflow settings; .env is git-ignored
 ```
 
-On Windows with GNU Make and Git Bash, use the Windows Python launcher and venv layout.
-
-```bash
-py -3.12 -m venv .venv
-make PYTHON_INTERPRETER=.venv/Scripts/python.exe requirements
-.venv/Scripts/python.exe -m pip check
-cp .env.example .env
-```
-
-Pass `PYTHON_INTERPRETER=.venv/Scripts/python.exe` to the remaining Make targets on Windows.
-See [Phase 3 integration checks](docs/verificacion-fase3.md#3-integración-de-fase-3-issue-43)
+On Windows, run the same commands from Git Bash with GNU Make (`choco install make`, or
+MinGW's `mingw32-make`). There the `Makefile` uses `.venv/Scripts/python` and creates the
+environments with the `py -3.12` launcher, so every target works without extra arguments.
+Without `make`, run the command that `make -n <target>` prints. See
+[Phase 3 integration checks](docs/verificacion-fase3.md#3-integración-de-fase-3-issue-43)
 for the macOS and Windows verification status.
 
-The `Makefile` uses `.venv/bin/python` by default. If you manage a separate Python 3.12
-environment, pass `PYTHON_INTERPRETER=/path/to/python` to `make` instead.
+The `Makefile` uses `.venv/bin/python` by default (`.venv/Scripts/python` on Windows). If you
+manage a separate Python 3.12 environment, pass `PYTHON_INTERPRETER=/path/to/python` to `make`
+instead.
 `requirements.txt` pins every direct dependency to the versions installed in the local
 Python 3.12 environment used for this branch's unit suite. It includes
 `requirements-serving.txt`, the subset that the prediction service, its Docker image and the
@@ -389,7 +393,7 @@ and notebook `3.02`:
 |---|---|---|
 | macOS, Apple M4 Pro (the machine of the snapshot) | 1.4e-14 / 1.1e-13 | Image `0.1.0`: difference 0 |
 | Clean Linux container (aarch64): clone, `make requirements`, `make test`, `make reproduce` | 8.4e-15 / 1.5e-13 | Image `0.1.1` from Docker Hub: difference 0 |
-| Another machine (a teammate) | Pending | Pending |
+| Another machine: WSL2 on an Intel Core Ultra 9 288V (Carlos Chavero) | Not run: its feature tables have other digests, and its 14 `train-*` runs differ by up to 0.037 | Image `0.1.1`: difference 0 ([docs/reproducibility/maquina-carlos-wsl.json](docs/reproducibility/maquina-carlos-wsl.json)) |
 
 The golden test (`tests/test_reproducibility.py`) runs in `pytest -q`. It checks that the
 reference request still fits the API and that the reference is the documented example. When
@@ -473,12 +477,13 @@ make lint                        # ruff format --check + ruff check
 
 | Command | Tests | Time |
 |---|---|---|
-| `pytest -q` | 292 | ~2 min |
-| `pytest -q -m "not integration"` | 291 | ~2 min |
-| `pytest -q -m integration` | 1 | ~15 s |
+| `pytest -q` | 307 | ~4 min |
+| `pytest -q -m "not integration"` | 305 | ~3 min |
+| `pytest -q -m integration` | 2 | ~40 s |
 
-These Windows timings (Ryzen 7 4800H, 16 GB) are from before the monitoring tests were added.
-Most of the time goes to the tests that log runs and models to MLflow.
+Times on a Windows laptop (Ryzen 7 4800H, 16 GB) on 22 Nov 2026; the suite takes about a
+minute longer when little memory is free. Most of the time goes to the tests that log runs and
+models to MLflow.
 
 ## Data versioning
 
@@ -577,8 +582,9 @@ VS Code (Ports tab) or run the server on a shared VM.
 │
 ├── pyproject.toml     <- Package metadata, pytest, coverage and ruff configuration
 ├── references         <- ml-canvas.md: requirements analysis and value proposition
-├── reports            <- Delivered Fase1_Equipo02.pdf and Fase2_Equipo02.pdf
-│   └── figures        <- Figures for fase1 and fase2
+├── reports            <- Delivered Fase1_Equipo02.pdf and Fase2_Equipo02.pdf; the final report
+│   │                     is written with the final-report skill (.claude/skills/)
+│   └── figures        <- Figures of the reports, one folder per phase
 ├── requirements.txt   <- Python dependencies (installs this package with `-e .`)
 ├── requirements-serving.txt <- The pinned subset for the service, the image and the logged models
 ├── requirements-lock.txt    <- Python runtime constraints, including Windows-only pins
