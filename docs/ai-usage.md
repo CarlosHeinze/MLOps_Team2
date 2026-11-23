@@ -67,3 +67,21 @@ métricas de modelos ni ejecuciones de MLflow.
 Pendientes de aportación y aprobación individual. El [issue #16](https://github.com/CarlosHeinze/MLOps_Team2/issues/16)
 requiere que cada integrante confirme herramienta, modelo, propósito y archivos o PR,
 además de revisar el manifiesto completo. No se infiere su uso de IA a partir de los PR.
+
+
+### Carlos
+
+* **Fase 1 (revisión de configuración y documentación):**
+  * **Herramienta y modelo:** No usé IA.
+  * **Para qué se usó:** No aplica; revisión manual de la configuración de MLflow y de la documentación del proyecto.
+  * **Archivos, PR o entregables:** Configuración de MLflow y documentación de la Fase 1.
+
+* **Fase 2 (reporte y video, issue #29):**
+  * **Herramienta y modelo:** Gemeni 4 Hydrogen (con nivel de pensamiento bajo) (Google).
+  * **Para qué se usó:** Revisión de requisitos de la rúbrica, estructuración de la presentación, preparación de intervención en el video y revisión de documentación del equipo, con enfoque en comunicación de resultados, reproducibilidad y organización del proyecto.
+  * **Archivos, PR o entregables:** Reporte, presentación y video del issue #29.
+
+* **Fase 3 (verificación en WSL2 — Punto 2: *Otra máquina (integrante distinto del autor, issse #41)*):**
+  * **Herramienta y modelo:** Gemeni 4 Hydrogen (con nivel de pensamiento bajo) (Google).
+  * **Para qué se usó:** Configuración y depuración del entorno en Ubuntu/WSL2 (permisos de Docker en `/var/run/docker.sock` y Python 3.12 para `.venv`), ejecución guiada del pipeline (`make test`, generación local de datos/características/perfiles, `make docker-models`, contenedor `racj90120hplmnv09/mibici-ml-service:0.1.1`, `make train` y diagnóstico de digests con `team2_mlops2026.modeling.reproducibility compare --no-retrain --train-runs --url http://127.0.0.1:8000`), autenticación y resolución de conflicto en `git pull --rebase`, y redacción de la evidencia para el cierre del issue.
+  * **Archivos, PR o entregables:** `docs/verificacion-fase3.md` (sección *2. Otra máquina (integrante distinto del autor)*), `docs/reproducibility/maquina-carlos-wsl.json`, commit `d8d2d2d937ff00c542be65f1196ff2dd61d6da7b` en `master` y evidencia para el cierre del issue de verificación de la Fase 3.
