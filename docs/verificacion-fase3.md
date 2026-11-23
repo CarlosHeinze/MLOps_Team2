@@ -122,10 +122,29 @@ seleccionó con `PYTHON_INTERPRETER`.
 | Comparación ligera | `make compare REPRODUCE_ARGS="--no-track --no-retrain --url http://127.0.0.1:8043"` aprobó con FastAPI local en el puerto alternativo. |
 | Make y monitoreo | `make help` mostró los siete targets de Fase 3 revisados. `make monitor MONITOR_ARGS=--help` y la prueba de monitoreo con datos sintéticos pasaron. |
 | Docker | Se revisaron las recetas de build, run, smoke y push con `make -n`. Falta ejecutar el smoke de la imagen publicada en un equipo con Docker. |
-| Windows x64 | PyPI resolvió los cinco paquetes exclusivos de Windows para CPython 3.12 x64 en un dry-run. Quedan pendientes la instalación nativa con `make requirements`, `pip check` y la suite en Windows. |
+| Windows x64 | PyPI resolvió los cinco paquetes exclusivos de Windows para CPython 3.12 x64 en un dry-run. La instalación nativa y la suite en Windows están en la tabla siguiente. |
 
 Los pins de Windows agregados al lock son `colorama` 0.4.6, `pywin32` 312,
 `pywinpty` 3.1.2, `waitress` 3.0.2 y `win32-setctime` 1.2.1.
 El cambio conserva los demás pins y las dependencias directas.
 Los pasos para verificar una instalación nativa de Windows están en la sección
 [Environment](../README.md#1-environment).
+
+### Windows
+
+Verificación nativa del 22 de noviembre de 2026 en Windows 10 Home, AMD Ryzen 7 4800H,
+16 GB, Python 3.12.0 y GNU Make 3.82.90 (`mingw32-make` de MinGW) desde Git Bash. La
+instalación y la suite corrieron en un venv nuevo sobre el commit de #56 (`e3d5f7c`); el resto,
+sobre la rama de este seguimiento. En este equipo no hay Docker.
+
+| Comprobación | Resultado |
+|---|---|
+| `make requirements` y `pip check` | Correcto en 4 min 49 s, sin conflictos. Instaló los cinco pins de Windows del lock (`pywinpty` 3.1.2, `win32-setctime` 1.2.1). |
+| `make lint` y `make test` | Ruff pasó. 306 aprobadas y 1 omitida (la prueba golden, sin `models/`) en 3 min 43 s, con los 35 avisos `Pandas4Warning` de MLflow. |
+| `make help` y `make create_environment` | Fallaban sin `PYTHON_INTERPRETER` porque llamaban a `python3.12`, que Windows no tiene. Ahora el `Makefile` usa `.venv/Scripts/python` y `py -3.12` en Windows, sin argumentos. |
+| Prueba intermitente | `test_clean_is_idempotent_and_reprocesses_on_new_inputs` falló en 2 de unas 12 corridas: `os.utime(..., None)` puede dar la misma marca de tiempo que las salidas recién escritas. La prueba ahora fija una marca posterior. |
+| Champions | Copiados de la capa de modelos de la imagen `0.1.1` (lo que hace `make docker-models`). El `model_card.json` apunta a los mismos runs y digests que `tests/data/reference.json`, y la prueba golden pasó. |
+| `make serve` | `serving.app check` reprodujo las tres filas de referencia con diferencia 0. |
+| `make reproduce` con la tabla local | Se detuvo con los digests esperados y los locales, como se documenta. |
+| `make monitor` (`--no-track`, escenarios `real` y `missing-features`) | 55 s y 2.5 GB de memoria máxima. El control quedó en `ok`; `missing-features` y la réplica de septiembre de 2026 dieron la alerta de calidad con la acción documentada. |
+| `features` y `station_profiles` con `--no-track` | 12,180,583 filas y las 3,576,680 de prueba del snapshot, pero digests `be111dbf98de...` y `4bfc7f903c7b...`. Los valores son iguales a los de la tabla local del 6 de noviembre; solo cambia la versión de pandas que guarda el Parquet. |
