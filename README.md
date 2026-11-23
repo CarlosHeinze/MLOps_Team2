@@ -393,7 +393,7 @@ and notebook `3.02`:
 |---|---|---|
 | macOS, Apple M4 Pro (the machine of the snapshot) | 1.4e-14 / 1.1e-13 | Image `0.1.0`: difference 0 |
 | Clean Linux container (aarch64): clone, `make requirements`, `make test`, `make reproduce` | 8.4e-15 / 1.5e-13 | Image `0.1.1` from Docker Hub: difference 0 |
-| Another machine (a teammate) | Pending | Pending |
+| Another machine: WSL2 on an Intel Core Ultra 9 288V (Carlos Chavero) | Not run: its feature tables have other digests, and its 14 `train-*` runs differ by up to 0.037 | Image `0.1.1`: difference 0 ([docs/reproducibility/maquina-carlos-wsl.json](docs/reproducibility/maquina-carlos-wsl.json)) |
 
 The golden test (`tests/test_reproducibility.py`) runs in `pytest -q`. It checks that the
 reference request still fits the API and that the reference is the documented example. When

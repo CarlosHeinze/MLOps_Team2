@@ -97,15 +97,15 @@ servidor MLflow de referencia, o la carpeta compartida por el equipo, y pasar `-
 
 | Dato | Resultado |
 |---|---|
-| Integrante, máquina, CPU, RAM | |
-| Sistema operativo | |
-| Commit (`git rev-parse HEAD`) | |
-| `make test` | |
-| Digests de la tabla (los revisa `compare`) | |
-| Reentrenamiento `departures` (máx. diferencia relativa de métricas, tolerancia `1e-4`) | |
-| Reentrenamiento `arrivals` | |
-| `make train` contra las 14 corridas de referencia | |
-| Servicio desde la imagen (`--url`) | |
+| Integrante, máquina, CPU, RAM | Carlos Chavero, HP OmniBook (WSL2), Intel Core Ultra 9 288V (8 CPUs), 15 GiB RAM |
+| Sistema operativo | Linux 6.18.33.2-microsoft-standard-WSL2 x86_64 GNU/Linux (Ubuntu on Windows / WSL2, Python 3.12) |
+| Commit (`git rev-parse HEAD`) | 59b56cd3b9619852a5e5bde2116ddec35e2cb491 |
+| `make test` | Correcto (código de salida 0) — 291 passed, 1 skipped en 66.83 s |
+| Digests de la tabla (los revisa `compare`) | features_digest: 75857847f53a78a330c347114f0c8987, profiles_digest: c9578c9c9963778247a15ce9afb8a9d0 (difieren del snapshot ea0f152256134089863214a3cdd2e4b4: 636e73295b9df173482041fd5cd04ede / 51c85bee5c1166854a6da55a41631c28) |
+| Reentrenamiento `departures` (máx. diferencia relativa de métricas, tolerancia `1e-4`) | No ejecutado (--no-retrain por digest de tabla distinto al snapshot ea0f152256134089863214a3cdd2e4b4) |
+| Reentrenamiento `arrivals` | No ejecutado (--no-retrain por digest de tabla distinto al snapshot ea0f152256134089863214a3cdd2e4b4) |
+| `make train` contra las 14 corridas de referencia | 14 corridas completadas localmente; en reproducibility compare --train-runs marcan FAIL (diferencias ~0.019–0.037 frente a tolerancias 1e-09–0.005) debido a que los datos locales tienen digests distintos al snapshot |
+| Servicio desde la imagen (`--url`) | Reproducido (OK: diferencia 0 en http://127.0.0.1:8000 con racj90120hplmnv09/mibici-ml-service:0.1.1; reporte en docs/reproducibility/maquina-carlos-wsl.json) |
 
 ## 3. Integración de Fase 3 (issue 43)
 
