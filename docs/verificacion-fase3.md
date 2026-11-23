@@ -106,3 +106,26 @@ servidor MLflow de referencia, o la carpeta compartida por el equipo, y pasar `-
 | Reentrenamiento `arrivals` | |
 | `make train` contra las 14 corridas de referencia | |
 | Servicio desde la imagen (`--url`) | |
+
+## 3. Integración de Fase 3 (issue 43)
+
+Verificación local del 22 de noviembre de 2026 desde `origin/master` en `a485bb8`,
+en macOS 27.2.1 arm64 con Python 3.12.13. El entorno de prueba se creó vacío y se
+seleccionó con `PYTHON_INTERPRETER`.
+
+| Comprobación | Resultado |
+|---|---|
+| `make requirements` y `python -m pip check` | Instalación limpia correcta. Los 186 paquetes de ejecución instalados coinciden con el lock. |
+| `make lint` y `make test` | Ruff pasó. 307 pruebas aprobadas en 72.47 s. Los 35 avisos fueron `Pandas4Warning` de MLflow al serializar ejemplos. |
+| Linaje del export | La prueba con SQLite temporal verificó para ambos targets la versión asociada a `champion`, el ID del run y los digests de features y perfiles en `model_card.json`. |
+| Servicio local | `/health`, `/model` y `/openapi.json` respondieron como se documenta. `/predict` y `serving.app check` reprodujeron las tres filas de referencia con diferencia máxima de 0. |
+| Comparación ligera | `make compare REPRODUCE_ARGS="--no-track --no-retrain --url http://127.0.0.1:8043"` aprobó con FastAPI local en el puerto alternativo. |
+| Make y monitoreo | `make help` mostró los siete targets de Fase 3 revisados. `make monitor MONITOR_ARGS=--help` y la prueba de monitoreo con datos sintéticos pasaron. |
+| Docker | Se revisaron las recetas de build, run, smoke y push con `make -n`. Falta ejecutar el smoke de la imagen publicada en un equipo con Docker. |
+| Windows x64 | PyPI resolvió los cinco paquetes exclusivos de Windows para CPython 3.12 x64 en un dry-run. Quedan pendientes la instalación nativa con `make requirements`, `pip check` y la suite en Windows. |
+
+Los pins de Windows agregados al lock son `colorama` 0.4.6, `pywin32` 312,
+`pywinpty` 3.1.2, `waitress` 3.0.2 y `win32-setctime` 1.2.1.
+El cambio conserva los demás pins y las dependencias directas.
+Los pasos para verificar una instalación nativa de Windows están en la sección
+[Environment](../README.md#1-environment).

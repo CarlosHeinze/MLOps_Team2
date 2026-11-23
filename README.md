@@ -40,13 +40,13 @@ reads only the previous step's output, so any step can be re-run on its own.
 | 10. Model Registry | `team2_mlops2026.modeling.registry` | `mibici-departures` and `mibici-arrivals`, aliases `champion` and `challenger` | `2.05` |
 | 11. Batch forecast | `team2_mlops2026.modeling.predict` | `data/processed/mibici/predictions/forecast_<YYYYMMDD_HH>h.parquet` and a `predict-<start>` run | `2.05` |
 | 12. Model export | `team2_mlops2026.modeling.export` | `models/mibici-<target>/`: each champion as registered, plus `models/model_card.json` | `3.01` |
-| 13. Online serving | `team2_mlops2026.serving.app` (FastAPI) | `POST /predict`, `GET /health` and `GET /model` on port 8000; schema in `docs/api/` | `3.01` |
-| 14. Container | `Dockerfile` (`make docker-build`, `make docker-push`) | Image [`racj90120hplmnv09/mibici-ml-service`](https://hub.docker.com/r/racj90120hplmnv09/mibici-ml-service) on Docker Hub, for amd64 and arm64 | — |
-| 15. Reproducibility | `team2_mlops2026.modeling.reproducibility` (`make snapshot`, `make reproduce`) | `snapshot-<digest>` run with the champions' tables and reference outputs, `tests/data/reference.json`, `reproduce-<model>` runs | `3.02` |
-| 16. Drift monitoring | `team2_mlops2026.monitoring` (`make monitor`) | `data/processed/mibici/monitoring/` and one `drift-<scenario>-<severity>` MLflow run per case | `3.03` |
+| 13. Online serving | `team2_mlops2026.serving.app` (`make serve`) | `POST /predict`, `GET /health` and `GET /model` on port 8000, with the schema in `docs/api/` | [`3.01`](notebooks/3.01-team2-model-serving.ipynb) |
+| 14. Container | `Dockerfile` (`make docker-build`, `make docker-run`, `make docker-push`) | Image [`racj90120hplmnv09/mibici-ml-service`](https://hub.docker.com/r/racj90120hplmnv09/mibici-ml-service) on Docker Hub for amd64 and arm64 | [`3.01`](notebooks/3.01-team2-model-serving.ipynb), [`3.02`](notebooks/3.02-team2-reproducibility.ipynb) |
+| 15. Reproducibility | `team2_mlops2026.modeling.reproducibility` (`make snapshot`, `make reproduce` or `make compare`) | `snapshot-<digest>` run with the champions' tables and reference outputs, `tests/data/reference.json`, `reproduce-<model>` runs | [`3.02`](notebooks/3.02-team2-reproducibility.ipynb) |
+| 16. Drift monitoring | `team2_mlops2026.monitoring` (`make monitor`) | `data/processed/mibici/monitoring/` and one `drift-<scenario>-<severity>` MLflow run per tracked case | [`3.03`](notebooks/3.03-team2-data-drift.ipynb) |
 
-Every step except the exploratory analysis is tracked in MLflow (see
-[Data versioning](#data-versioning) and [MLflow](#mlflow-comparing-runs-and-the-model-registry)).
+The tracked data, modeling, reproducibility and monitoring steps record lineage in MLflow.
+See [Data versioning](#data-versioning) and [MLflow](#mlflow-comparing-runs-and-the-model-registry).
 
 ## How to run
 
@@ -57,13 +57,48 @@ Requirements:
   a lower `--workers` value if memory is tight. Notebook `1.02` loads all 39M trips at once and
   needs about 20 GB.
 
+### Phase 3 quick start
+
+From a clean checkout, [set up the environment](#1-environment) and use the commands below
+from the project root. The Phase 3 tests, service and container can run before the feature
+tables are available. For historical monitoring, place the team's two Parquet artifacts in
+`data/processed/mibici/features/` as described in [Drift monitoring](#8-drift-monitoring).
+
+| Order | Command | Inputs and running services |
+|---|---|---|
+| 1. Test | `make test` | The suite uses small fixtures and a temporary MLflow store. |
+| 2. Get the champions | `make export` or `make docker-models` | Export from a populated MLflow Registry with the `champion` aliases, or copy the exports from the published image with Docker. Both routes write `models/model_card.json` and the two model folders. |
+| 3. Serve | `make serve` | The default local service loads those exports. Once they are present, MLflow can be stopped. |
+| 4. Check the container | `make docker-smoke SMOKE_IMAGE=racj90120hplmnv09/mibici-ml-service:0.1.1` | Docker with the published image. For a local build, see [Docker image](#6-docker-image). |
+| 5. Monitor | `make monitor MONITOR_ARGS="--no-track --scenario real --real-month 2026-09"` | Both model exports and the two feature Parquets. Enable tracking by dropping `--no-track` and starting `make mlflow`. The service and Docker can be stopped. |
+
+For replay on a machine with limited RAM, reuse the exported models and feature tables.
+The commands above require no raw-data download or champion refit. The full reproducibility
+comparison is a separate check and refits by default. See [Reproducibility](#7-reproducibility).
+
 ### 1. Environment
+
+`make` requires GNU Make. On macOS a native LightGBM import needs the OpenMP runtime.
+Install it with `brew install libomp` if it is missing.
 
 ```bash
 make create_environment            # requires Python 3.12
 make requirements                  # installs into .venv with requirements-lock.txt
 cp .env.example .env               # local MLflow settings; .env is git-ignored
 ```
+
+On Windows with GNU Make and Git Bash, use the Windows Python launcher and venv layout.
+
+```bash
+py -3.12 -m venv .venv
+make PYTHON_INTERPRETER=.venv/Scripts/python.exe requirements
+.venv/Scripts/python.exe -m pip check
+cp .env.example .env
+```
+
+Pass `PYTHON_INTERPRETER=.venv/Scripts/python.exe` to the remaining Make targets on Windows.
+See [Phase 3 integration checks](docs/verificacion-fase3.md#3-integración-de-fase-3-issue-43)
+for the macOS and Windows verification status.
 
 The `Makefile` uses `.venv/bin/python` by default. If you manage a separate Python 3.12
 environment, pass `PYTHON_INTERPRETER=/path/to/python` to `make` instead.
@@ -74,13 +109,11 @@ logged models need, so each pin lives in one file only. The pandas, pyarrow, MLf
 and scikit-learn pins also match the combination reported as working in issue
 [#12](https://github.com/CarlosHeinze/MLOps_Team2/issues/12).
 
-`requirements-lock.txt` pins every package, the transitive ones too (186), as `pip install
--r requirements.txt` resolved them in a clean Python 3.12 venv. `make requirements` and the
-Docker image install with it as constraints (`-c`), so every machine gets the same versions; a
-package that only one OS needs (such as `colorama` on Windows) is still resolved there. After
-changing a pin in `requirements.txt` or `requirements-serving.txt`, regenerate it with
-`make lock` (`make lock LOCK_PYTHON=/path/to/python3.12` if `python3.12` is not on the path);
-a test fails while a pin is missing from it.
+`requirements-lock.txt` holds the resolved Python 3.12 runtime pins, including Windows-only
+constraints. `make requirements` and the Docker image pass it to pip with `-c`. After changing
+a direct pin, run `make lock` on macOS or Linux. It retains the Windows-only pins, which
+should be reviewed when Windows dependencies change. If `python3.12` is elsewhere, pass
+`LOCK_PYTHON=/path/to/python3.12`. The tests check the direct pins against the lock.
 
 ### 2. MLflow tracking server
 
@@ -181,12 +214,15 @@ Times on a 2019 MacBook Pro (8-core i9, 64 GB):
 ### 5. Serving the champions (FastAPI)
 
 The service forecasts online with the same models and the same numbers as the batch forecast.
-It loads the champions from `models/`, so once they are exported it needs no MLflow server:
+It loads the champions from `models/`. If the exports are missing, use one of the preparation
+routes in the [Phase 3 quick start](#phase-3-quick-start).
 
 ```bash
-make export     # models:/mibici-<target>@champion -> models/ (needs the MLflow server)
 make serve      # http://127.0.0.1:8000, Swagger UI at http://127.0.0.1:8000/docs
 ```
+
+From another terminal, `python -m team2_mlops2026.serving.app check --url http://127.0.0.1:8000`
+checks the documented example against the live service with the project environment active.
 
 Served models (alias `champion`, exported on 2026-11-18):
 
@@ -212,27 +248,12 @@ scores `pc1`-`pc5`. `null` marks an unknown value, as NaN does in the feature ta
 with three stations at the morning peak of 9 Sep 2026, the night replayed in notebook `2.05`:
 
 ```bash
-curl -s -X POST http://127.0.0.1:8000/predict \
+curl --fail --silent --show-error http://127.0.0.1:8000/predict \
   -H "Content-Type: application/json" \
-  -d @docs/api/example_request.json
+  --data-binary "@docs/api/example_request.json"
 ```
 
-The response ([docs/api/example_response.json](docs/api/example_response.json)), shortened:
-
-```json
-{
-  "predictions": [
-    {"station_id": 51, "hour_start": "2026-09-09T08:00:00", "departures": 46.84400274438855,
-     "arrivals": 14.689625404127986, "net_flow": -32.15437734026056},
-    ...
-  ],
-  "models": {
-    "departures": {"name": "mibici-departures", "version": "1", "alias": "champion",
-                   "uri": "models:/mibici-departures/1"},
-    ...
-  }
-}
-```
+The complete response is in [docs/api/example_response.json](docs/api/example_response.json).
 
 | Status | When |
 |---|---|
@@ -259,34 +280,33 @@ Python, no MLflow server and no data. It is published on Docker Hub for `linux/a
 (Windows and Intel or AMD Linux) and `linux/arm64` (Apple silicon), and `docker pull` takes
 the one of the machine.
 
-**Run the published image:**
+**Run the published image.** Stop the local service first to free port 8000.
 
 ```bash
 docker run -d --name mibici-ml-service -p 8000:8000 racj90120hplmnv09/mibici-ml-service:0.1.1
 curl -s http://127.0.0.1:8000/health
 # {"status":"ok","models_loaded":true,"source":"local"}
-curl -s -X POST http://127.0.0.1:8000/predict \
-  -H "Content-Type: application/json" -d @docs/api/example_request.json
+curl --fail --silent --show-error http://127.0.0.1:8000/predict \
+  -H "Content-Type: application/json" --data-binary "@docs/api/example_request.json"
 docker exec mibici-ml-service python -m team2_mlops2026.serving.app check
 docker rm -f mibici-ml-service
 ```
 
-`check` runs inside the container: it sends the example request kept in the image and compares
-the answer with `docs/api/example_response.json`. In Windows PowerShell, write `curl.exe`
-instead of `curl`, or open http://127.0.0.1:8000/docs.
+`check` runs inside the container. It sends the example request kept in the image and compares
+the answer with `docs/api/example_response.json`. The shell examples use Bash. In Windows
+PowerShell, use `curl.exe` and put the arguments on one line, or open http://127.0.0.1:8000/docs.
 
-**Build and run it locally:**
+**Build and run it locally.**
 
 ```bash
-make export                                # or make docker-models (below)
-docker build -t ml-service:latest .        # make docker-build adds the labels
-docker run -p 8000:8000 ml-service:latest  # make docker-run
-make docker-smoke                          # starts ml-service:latest in the background and runs check
+make docker-build     # requires the two exported models and model_card.json
+make docker-run       # stop with Ctrl+C before running the next command
+make docker-smoke     # starts the local image and checks it against the golden example
 ```
 
 The build fails with a clear message if `models/` is empty. Without access to the MLflow
-server, `make docker-models` copies the models out of the published image into `models/`, and
-`make docker-build` then rebuilds the same image from the repository.
+server, `make docker-models` copies the models out of the published image into `models/`,
+and `make docker-build` builds the image from the current checkout with the model and commit labels.
 
 **Published tags** ([Docker Hub](https://hub.docker.com/r/racj90120hplmnv09/mibici-ml-service)):
 
@@ -345,19 +365,20 @@ The deployable model can be rebuilt and checked in another environment:
 ```bash
 make snapshot     # once per champion: needs the MLflow server, models/ and the feature table
 make reproduce    # on any machine: refit the champions, compare the train runs, check the service
-make reproduce REPRODUCE_ARGS="--no-track --url http://127.0.0.1:8000 --save docs/reproducibility/<name>.json"
+make compare REPRODUCE_ARGS="--no-track --no-retrain --url http://127.0.0.1:8000 --save docs/reproducibility/local-comparison.json"
 ```
 
-`make reproduce` (`python -m team2_mlops2026.modeling.reproducibility compare`):
-1. checks that the local feature table has the snapshot's digests, and refuses to go on otherwise;
-2. refits each champion with its own params (an unfitted clone of the exported model) on the
-   training split, and compares its test metrics with the reference. It also scores the exported
-   champion, so a difference in the data shows up apart from one in the training;
-3. with `--train-runs`, compares the latest local `train-*` runs (`make train`) with the
-   reference ones;
-4. with `--url`, sends the reference rows to a running service and compares the forecasts;
-5. logs a `reproduce-<model>` run with the environment (OS, CPU, Python, packages, commit) and
-   the differences, unless `--no-track`, and exits with 1 if a check fails.
+`make compare` is an alias for `make reproduce`. Both run
+`python -m team2_mlops2026.modeling.reproducibility compare`.
+1. With the default `--retrain`, it verifies the snapshot digests, refits an unfitted clone of
+   each exported champion, and scores both the refit and the export on the test split.
+2. With `--train-runs`, it compares existing local `train-*` runs with the reference.
+3. With `--url`, it submits the reference request to the running service and compares the forecasts.
+4. It records the checks in MLflow unless `--no-track` is set. A failed check exits with code 1.
+
+The `--no-retrain --no-track --url` example above only runs the HTTP comparison. It uses
+`tests/data/reference.json` and the running service. It needs neither the feature tables nor
+an MLflow server on the machine running the comparison.
 
 The tolerances are `METRIC_RTOL` in `modeling/reproducibility.py`: `1e-9` for the baselines,
 `1e-4` for LightGBM, `5e-3` for the histogram boosting. The ML Canvas §8 explains them and what
@@ -377,7 +398,8 @@ that they give the golden forecasts; otherwise that one test is skipped.
 
 ### 8. Drift monitoring
 
-Use the station-hour features and profiles from the team snapshot and both exported champions.
+Put `station_hour_features.parquet` and `station_profiles.parquet` in
+`data/processed/mibici/features/` and use both exported champions in `models/`.
 The default uses October 2025 as held-out validation for monitoring, November 2025 as the
 source for the simulations, and September 2026 for the unmodified historical replay. The
 baselines and the station demand groups use the models' recorded training window.
@@ -409,7 +431,9 @@ Run them in order: `0.01` → `1.01` → `1.02` → `1.03` → `1.04` → `1.05`
   and compares the answer with the batch forecast.
 - `3.02` needs `make mlflow` and the image running on port 8000. It refits the champions (about
   six minutes) and compares them, and the results of `docs/reproducibility/`, with the reference.
-- `3.03` compares the monitoring scenarios, alerts and proposed responses.
+- `3.03` compares monitoring scenarios, alerts and proposed responses. The synthetic mode
+  has a private SQLite store. Historical mode (`MIBICI_MONITOR_HISTORICAL=1`) uses the
+  team's feature tables and the exported champions.
 
 ### 10. Tests and lint
 
@@ -424,8 +448,8 @@ It needs no historical data and no MLflow server: the tests build small syntheti
 command.
 
 ```bash
-pytest -q -m "not integration"   # only the unit tests
-pytest -q -m integration         # only the end-to-end test
+pytest -q -m "not integration"   # suite without the integration tests
+pytest -q -m integration         # the end-to-end checks
 pytest -q --cov                  # with the line coverage of team2_mlops2026
 make lint                        # ruff format --check + ruff check
 ```
@@ -434,15 +458,18 @@ make lint                        # ruff format --check + ruff check
   rules of each step on hand-made data: the cleaning contract, the lags and the preprocessing
   (`test_features`), the metrics and the success criterion (`test_evaluate`), the forecast and
   the profile join (`test_predict`), the tracked runs, the Registry and the lineage, and the
-  export of the champions (`test_export`). `test_serving` calls the API with `TestClient` on
+  export of the champions (`test_export`). `test_lineage` checks both exported card entries
+  against their registered champion, source run and feature and profile digests.
+  `test_serving` calls the API with `TestClient` on
   small synthetic models: the forecasts equal `predict.forecast`, invalid rows get 422, an
   empty or oversized batch 400, and the service without models 503.
-- **Integration test:** `tests/test_pipeline_integration.py`, marked `integration`. It runs
+- **Integration tests:** `tests/test_pipeline_integration.py` runs
   the pipeline end to end on three months of synthetic commutes: raw CSVs → normalization →
   cleaning → features → station profiles → training of a baseline and a small LightGBM →
   champion in the Registry → 24 h forecast → metrics on the held-out month. At each step it
   checks the columns the next step reads, so a renamed feature column or a wrong net flow
-  makes it fail.
+  makes it fail. `tests/test_monitoring.py` exercises tracked monitoring and the offline CLI
+  with a small synthetic fixture.
 
 | Command | Tests | Time |
 |---|---|---|
@@ -450,8 +477,8 @@ make lint                        # ruff format --check + ruff check
 | `pytest -q -m "not integration"` | 291 | ~2 min |
 | `pytest -q -m integration` | 1 | ~15 s |
 
-Times on a Windows laptop (Ryzen 7 4800H, 16 GB). Most of the time goes to the tests that log
-runs and models to MLflow.
+These Windows timings (Ryzen 7 4800H, 16 GB) are from before the monitoring tests were added.
+Most of the time goes to the tests that log runs and models to MLflow.
 
 ## Data versioning
 
@@ -520,14 +547,18 @@ VS Code (Ports tab) or run the server on a shared VM.
 │   ├── raw            <- MiBici CSVs exactly as published, plus manifest.json
 │   ├── interim        <- Typed Parquet, one schema for every month
 │   └── processed      <- Cleaned trips, cleaning_report.json, feature table, station profiles
-│                         and forecasts
+│                         forecasts and monitoring results
 │
 ├── docs
-│   ├── api            <- OpenAPI schema and an example request and response (make api-docs)
+│   ├── api            <- Generated by make api-docs
+│   │   ├── openapi.json
+│   │   ├── example_request.json
+│   │   └── example_response.json
+│   ├── monitoring.md <- Drift scenarios, provenance and verification
 │   ├── reproducibility  <- Results of make reproduce in other environments, and the container script
 │   └── verificacion-fase3.md <- The clean-environment checks of Phase 3
 ├── models             <- Git-ignored; the champions exported for serving, plus model_card.json
-│                         (make export). The versions live in the MLflow Model Registry
+│                         (make export or make docker-models)
 ├── notebooks          <- PHASE.NOTEBOOK-team2-description, run in order
 │   ├── 0.01-team2-initial-data-exploration.ipynb
 │   ├── 1.01-team2-data-format-normalization.ipynb
@@ -541,16 +572,16 @@ VS Code (Ports tab) or run the server on a shared VM.
 │   ├── 2.04-team2-model-evaluation.ipynb
 │   ├── 2.05-team2-model-registry.ipynb
 │   ├── 3.01-team2-model-serving.ipynb
-│   └── 3.02-team2-reproducibility.ipynb
+│   ├── 3.02-team2-reproducibility.ipynb
+│   └── 3.03-team2-data-drift.ipynb
 │
 ├── pyproject.toml     <- Package metadata, pytest, coverage and ruff configuration
 ├── references         <- ml-canvas.md: requirements analysis and value proposition
-├── reports            <- Delivered reports (Fase1_Equipo02.pdf, Fase2_Equipo02.pdf) and the
-│   │                     final one, written with the final-report skill (.claude/skills/)
-│   └── figures        <- Figures of the reports, one folder per phase (fase1, fase2, fase3)
+├── reports            <- Delivered Fase1_Equipo02.pdf and Fase2_Equipo02.pdf
+│   └── figures        <- Figures for fase1 and fase2
 ├── requirements.txt   <- Python dependencies (installs this package with `-e .`)
 ├── requirements-serving.txt <- The pinned subset for the service, the image and the logged models
-├── requirements-lock.txt    <- Every package at its version, transitive ones too (make lock)
+├── requirements-lock.txt    <- Python runtime constraints, including Windows-only pins
 ├── tests              <- pytest suite: one module per source module, plus the end-to-end
 │   │                     test_pipeline_integration.py
 │   └── data           <- reference.json: the golden reference set of the champions (make snapshot)
@@ -567,6 +598,7 @@ VS Code (Ports tab) or run the server on a shared VM.
     ├── station_profiles.py  <- Step 6: station usage profiles reduced with PCA
     ├── plots.py       <- Charts used by the notebooks
     ├── tracking.py    <- MLflow helpers: runs and dataset logging with digests
+    ├── monitoring.py  <- Step 16: drift, replay, metrics and alerts
     ├── serving
     │   ├── schemas.py <- Step 13: Pydantic request and response schemas (the data contract)
     │   └── app.py     <- Step 13: FastAPI service, POST /predict, GET /health and /model
