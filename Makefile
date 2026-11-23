@@ -29,19 +29,20 @@ DOCKER_LABELS = --build-arg VERSION=$(VERSION) --build-arg GIT_COMMIT=$(GIT_COMM
 #################################################################################
 
 
-## Install Python dependencies, every transitive one at the version of requirements-lock.txt
+## Install Python dependencies using the pins in requirements-lock.txt
 .PHONY: requirements
 requirements:
 	$(PYTHON_INTERPRETER) -m pip install -r requirements.txt -c requirements-lock.txt
 
 
-## Regenerate requirements-lock.txt in a clean venv (LOCK_PYTHON: a Python 3.12 interpreter)
+## Regenerate the macOS/Linux lock in a clean Python 3.12 venv, keeping the Windows pins
 .PHONY: lock
 lock:
 	rm -rf .lock-venv
 	$(LOCK_PYTHON) -m venv .lock-venv
 	.lock-venv/bin/python -m pip install --quiet --disable-pip-version-check -r requirements.txt
 	head -n 4 requirements-lock.txt > .lock-venv/lock.txt
+	sed -n '/; sys_platform == "win32"$$/p' requirements-lock.txt >> .lock-venv/lock.txt
 	.lock-venv/bin/python -m pip freeze --exclude-editable --disable-pip-version-check >> .lock-venv/lock.txt
 	mv .lock-venv/lock.txt requirements-lock.txt
 	rm -rf .lock-venv
@@ -204,10 +205,15 @@ snapshot:
 	$(PYTHON_INTERPRETER) -m team2_mlops2026.modeling.reproducibility snapshot
 
 
-## Compare this machine with the reference: refit the champions, train runs, service (REPRODUCE_ARGS)
+## Run the reproducibility compare CLI with REPRODUCE_ARGS (refits by default)
 .PHONY: reproduce
 reproduce:
 	$(PYTHON_INTERPRETER) -m team2_mlops2026.modeling.reproducibility compare $(REPRODUCE_ARGS)
+
+
+## Alias for reproduce (honors REPRODUCE_ARGS)
+.PHONY: compare
+compare: reproduce
 
 
 ## Replay held-out months for drift, forecast error and alerts (MONITOR_ARGS)
@@ -243,4 +249,4 @@ endef
 export PRINT_HELP_PYSCRIPT
 
 help:
-	@python$(PYTHON_VERSION) -c "${PRINT_HELP_PYSCRIPT}" < $(MAKEFILE_LIST)
+	@$(if $(wildcard $(PYTHON_INTERPRETER)),$(PYTHON_INTERPRETER),$(LOCK_PYTHON)) -c "${PRINT_HELP_PYSCRIPT}" < $(MAKEFILE_LIST)

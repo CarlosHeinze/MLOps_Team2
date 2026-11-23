@@ -1,7 +1,12 @@
-# Every package that `pip install -r requirements.txt` resolves in a clean Python 3.12 venv
-# (pip freeze). `make requirements` and the Docker image install with it as constraints, so
-# the transitive dependencies are the same on every machine. Regenerate it with `make lock`
-# after changing a pin in requirements.txt or requirements-serving.txt.
+# Constraints for runtime dependencies resolved on Python 3.12, including Windows-only pins.
+# `make requirements` and the Docker image use this file with `-c`.
+# Regenerate the macOS/Linux pins with `make lock` after changing a direct pin.
+# Review the Windows-only pins when a Windows requirement changes.
+colorama==0.4.6; sys_platform == "win32"
+pywin32==312; sys_platform == "win32"
+pywinpty==3.1.2; sys_platform == "win32"
+waitress==3.0.2; sys_platform == "win32"
+win32-setctime==1.2.1; sys_platform == "win32"
 aiohappyeyeballs==2.7.1
 aiohttp==3.14.5
 aiosignal==1.4.0

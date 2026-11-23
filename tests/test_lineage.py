@@ -1,12 +1,17 @@
 """The tracked steps form one lineage: each step's output digest is the next step's input."""
 
+import mlflow
+from mlflow.tracking import MlflowClient
 from test_raw_data_extraction import FakeResponse, FakeSession
 from test_raw_data_normalization import raw_dir  # noqa: F401  (fixture: every raw variant)
 from test_train import TEST_START, lineage  # noqa: F401  (fixture: tracked features, profiles)
 
+from team2_mlops2026 import features as ft
 from team2_mlops2026.data import interim_data_cleaning as idc
 from team2_mlops2026.data import raw_data_extraction as rde
 from team2_mlops2026.data import raw_data_normalization as rdn
+from team2_mlops2026.modeling import export as ex
+from team2_mlops2026.modeling import registry as reg
 from team2_mlops2026.modeling import train as tr
 from team2_mlops2026.tracking import input_digests
 
@@ -37,12 +42,32 @@ def test_tracked_steps_chain_from_raw_to_processed(raw_dir, tmp_path, mlflow_sto
     assert normalized["mibici_stations"] == cleaned["mibici_stations"]
 
 
-def test_model_runs_read_the_tables_the_feature_steps_wrote(lineage):  # noqa: F811
+def test_champion_export_preserves_run_lineage(lineage, tmp_path):  # noqa: F811
     features = digests(lineage["features"])
     profiles = digests(lineage["profiles"])
-    (model,) = tr.train_tracked(["seasonal_naive"], ["departures"], lineage["dir"], TEST_START)
-    trained = input_digests(model.run_id)
+    trained_models = tr.train_tracked(["seasonal_naive"], ft.TARGETS, lineage["dir"], TEST_START)
 
-    # features -> profiles -> model: the model run read the tables both steps wrote
-    assert features[FEATURES] == profiles[FEATURES] == trained[FEATURES]
-    assert profiles[PROFILES] == trained[PROFILES]
+    assert profiles[FEATURES] == features[FEATURES]
+    for model in trained_models:
+        run = mlflow.get_run(model.run_id)
+        reg.register(reg.Entry(model.name, model.target, reg.CHAMPION, run, run, run, None))
+
+    dst = tmp_path / "models"
+    ex.export_models(dst=dst)
+    card = ex.read_card(dst)
+    assert set(card["models"]) == set(ft.TARGETS)
+    client = MlflowClient()
+    for model in trained_models:
+        name = reg.model_name(model.target)
+        version = client.get_model_version_by_alias(name, reg.CHAMPION)
+        entry = card["models"][model.target]
+        assert entry["alias"] == reg.CHAMPION
+        assert entry["name"] == name
+        assert entry["version"] == str(version.version)
+        assert entry["uri"] == f"models:/{name}/{version.version}"
+        assert entry["run_id"] == version.run_id == model.run_id
+        inputs = input_digests(entry["run_id"])
+        assert entry["tags"]["features_digest"] == version.tags["features_digest"]
+        assert entry["tags"]["features_digest"] == inputs[FEATURES] == features[FEATURES]
+        assert entry["tags"]["profiles_digest"] == version.tags["profiles_digest"]
+        assert entry["tags"]["profiles_digest"] == inputs[PROFILES] == profiles[PROFILES]
