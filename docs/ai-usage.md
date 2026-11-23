@@ -1,5 +1,36 @@
 # Declaración de uso de IA
 
+## Fase 3
+
+### JulianMaloRomeroTEC
+
+**Referencia:** OpenAI (2026). *ChatGPT* y *Codex* (GPT-6.2 Sol High).
+
+**Propósito y alcance:** usé IA para asistir en el diseño y la depuración del monitoreo
+de deriva de datos, las pruebas de registro en MLflow y el análisis del replay histórico
+de septiembre de 2026. También la usé para proponer y revisar cambios al `Makefile`,
+a las dependencias y a las pruebas de linaje de los modelos exportados, y para redactar
+la documentación.
+
+**Verificación humana:** revisé los cambios y contrasté las métricas y alertas reportadas
+con las ejecuciones de monitoreo registradas en MLflow. Verifiqué en macOS la instalación
+de dependencias, el lint y las 307 pruebas, incluida la comprobación del linaje desde el alias
+`champion` hasta el run y los digests en `model_card.json`. La comparación con el servicio local
+validó las predicciones de referencia de los modelos exportados con `--no-retrain`.
+
+**Límites de reproducibilidad:** el replay real de septiembre de 2026 usó los Parquet
+compartidos por el equipo. Los digests de las tablas de características y perfiles difieren
+de los del snapshot original de los modelos `champion`. Los puntajes PCA también difirieron
+en los tres casos de referencia reconstruidos a partir de esos archivos. Las métricas del
+replay corresponden a la exportación compartida y la prueba de predicciones de referencia
+se verificó con entradas fijas. Reproducir el entrenamiento original requiere las tablas
+del snapshot con sus digests correspondientes.
+
+**PR e issues:** [PR #55](https://github.com/CarlosHeinze/MLOps_Team2/pull/55)
+([issue #42](https://github.com/CarlosHeinze/MLOps_Team2/issues/42)) y
+[PR #56](https://github.com/CarlosHeinze/MLOps_Team2/pull/56)
+([issue #43](https://github.com/CarlosHeinze/MLOps_Team2/issues/43)).
+
 ## Fase 2
 
 Todo el código se revisó y ejecutó, y todas las cifras del reporte provienen de ejecutar ese
@@ -24,6 +55,19 @@ Javier revisó y asume la responsabilidad de los commits y de las afirmaciones d
 [#36](https://github.com/CarlosHeinze/MLOps_Team2/pull/36) y los documentos de
 [#29](https://github.com/CarlosHeinze/MLOps_Team2/issues/29).
 
+### JulianMaloRomeroTEC
+
+**Referencia:** OpenAI (2026). *ChatGPT*.
+
+**Propósito y alcance:** usé ChatGPT para revisar la rúbrica y la documentación de entrega
+y para preparar y revisar el guion y el material del video. Mi aporte se centró en la
+documentación y la comunicación de los resultados generados por el equipo.
+
+**Verificación humana:** revisé el guion y el material del video frente a la rúbrica
+y la documentación del equipo.
+
+**Issue:** [#29](https://github.com/CarlosHeinze/MLOps_Team2/issues/29).
+
 ### Revisión automática de PR
 
 GitHub Copilot revisó los pull requests
@@ -43,17 +87,18 @@ contribución de Julian; no atribuye uso de IA a otros compañeros.
 
 ### JulianMaloRomeroTEC
 
-**Referencia:** OpenAI (2026). *Codex* (agente de programación basado en la familia GPT-6)
-[modelo de lenguaje]. https://openai.com/codex/ . El identificador exacto del modelo de
-esta sesión no se presenta en los materiales del repositorio y debe confirmarse en la
-interfaz antes de entregar la cita definitiva.
+**Referencia:** OpenAI (2026). *ChatGPT* y *Codex* (GPT-6 Sol Medium).
 
-**Propósito y alcance:** apoyo en la auditoría del repositorio y sus PR, identificación
-de tareas pendientes, redacción y revisión de documentación, propuesta y edición de
-cambios de reproducibilidad, y análisis de resultados de verificaciones locales.
-Julian revisa y asume la responsabilidad de los commits y de cualquier afirmación
-incluida en la presentación. No se empleó IA para fabricar resultados de datos reales,
-métricas de modelos ni ejecuciones de MLflow.
+**Propósito y alcance:** usé IA para apoyar el diagnóstico del repositorio y de los PR,
+proponer y revisar cambios de reproducibilidad en el `Makefile`, las dependencias y
+la configuración local de MLflow, y redactar y revisar la documentación de la entrega.
+
+**Verificación humana:** revisé los cambios, los resultados de `make test`, `make lint`
+y `pip check`, y la validez de los notebooks. La verificación fue local. La ejecución
+completa con el historial de MiBici quedó fuera de la verificación de este PR. Las cifras
+históricas de la presentación se atribuyeron a los PR del equipo.
+
+**PR:** [#21](https://github.com/CarlosHeinze/MLOps_Team2/pull/21).
 
 **Archivos de esta contribución:** `Makefile`, `README.md`, `requirements.txt`,
 `.env.example`, `team2_mlops2026/config.py`, `team2_mlops2026/tracking.py`,
